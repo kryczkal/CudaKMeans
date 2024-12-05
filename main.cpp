@@ -4,19 +4,25 @@
 
 #include <iostream>
 #include <cuda_runtime.h>
-#include "cuda_utils.h"
+#include "CudaUtils.h"
 #include <cinttypes>
+#include <format>
 
 #include "profiler.h"
 #include "kernels.h"
 #include "wrappers.h"
-#include "utils.h"
+#include "GeneralUtils.h"
 
-static constexpr uint64_t N = 1e5;
-static constexpr uint64_t D = 2;
-static constexpr uint64_t K = 3;
+static constexpr uint64_t N = 1e8;
+static constexpr uint64_t D = 5;
+static constexpr uint64_t K = 4;
 int main() {
-    cudaDeviceInfo();
+    CudaUtils::printCudaDeviceInfo();
+
+    double total_size_bytes = N * D * sizeof(float) + K * D * sizeof(float) + N * sizeof(int);
+    if (!GeneralUtils::fitsInGlobalMemory(total_size_bytes)) {
+        std::cerr << "Requested data: " << total_size_bytes / 1e9 << " GB" << " does not fit into global memory" << std::endl;
+    }
 
     float* h_data, *h_centroids;
     int* h_labels;
@@ -34,10 +40,12 @@ int main() {
         h_centroids[i] = h_data[i];
     }
 
-    cpu_kmeans(h_data, h_centroids, h_labels, N, D, K, 100);
-    visualize_kmeans(h_data, h_centroids, h_labels, N, D, K, 80, 24);
-    naive_kmeans(h_data, h_centroids, h_labels, N, D, K, 100);
-    visualize_kmeans(h_data, h_centroids, h_labels, N, D, K, 80, 24);
+//    cpu_kmeans(h_data, h_centroids, h_labels, N, D, K, 100);
+//    visualize_kmeans(h_data, h_centroids, h_labels, N, D, K, 80, 24);
+//    naive_kmeans(h_data, h_centroids, h_labels, N, D, K, 100);
+//    visualize_kmeans(h_data, h_centroids, h_labels, N, D, K, 80, 24);
+    reduction_v1_kmeans(h_data, h_centroids, h_labels, N, D, K, 100);
+    GeneralUtils::visualizeKmeans(h_data, h_centroids, h_labels, N, D, K, 80, 24);
 
     CHECK_CUDA_ERROR(cudaGetLastError());
     CHECK_CUDA_ERROR(cudaDeviceSynchronize());

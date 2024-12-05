@@ -14,15 +14,15 @@
 // K - number of clusters - 2-20
 
 /*
- * LABELING KERNELS
+ * Naive k-means algorithm
  */
-
 __global__ void naive_labeling(const float* data, const float* centroids, int* labels, int n, int d, int k);
+__global__ void naive_centroid_update(const float* data, const int* labels, float* centroids, int n, int d, int k, bool* changes);
 
 /*
- * CENTROID UPDATE KERNELS
+ * Shared memory reduction k-means algorithm
  */
-
-__global__ void naive_centroid_update(const float* data, const int* labels, float* centroids, int n, int d, int k, bool* changes);
+__global__ void reduction_v1_labeling(const float *data, const float *centroids, int *labels, int n, int d, int k);
+__global__ void reduction_v1_centroid_update(const float *data, const int *labels, float *centroids, int *counts, int n, int d, int k);
 
 #endif //CUDAKMEANS_KERNELS_H

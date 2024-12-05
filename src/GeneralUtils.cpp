@@ -5,10 +5,13 @@
 #include <cmath>
 #include <algorithm>
 #include <cinttypes>
+#include "GeneralUtils.h"
+#include "CudaUtils.h"
+
 
 // Function to visualize K-means clustering result
-void visualize_kmeans(const float* data, const float* centroids, const int* labels, uint64_t N, uint64_t D, uint64_t K,
-                      const int width, const int height) {
+void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, const int* labels, uint64_t N, uint64_t D, uint64_t K,
+                                   int width, int height) {
     // Compute mean vector
     float* mean = new float[D]();
     for (uint64_t n = 0; n < N; ++n)
@@ -230,4 +233,12 @@ void visualize_kmeans(const float* data, const float* centroids, const int* labe
     delete[] evec2;
     delete[] projected_data;
     delete[] projected_centroids;
+}
+
+bool GeneralUtils::fitsInGlobalMemory(uint64_t mem_size_bytes, uint64_t device_id) {
+    cudaDeviceProp prop;
+    CHECK_CUDA_ERROR(cudaGetDeviceProperties(&prop, device_id));
+    size_t freeMem, totalMem;
+    CHECK_CUDA_ERROR(cudaMemGetInfo(&freeMem, &totalMem));
+    return mem_size_bytes <= freeMem;
 }

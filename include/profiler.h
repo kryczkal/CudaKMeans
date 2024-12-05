@@ -7,7 +7,7 @@
 
 #include <functional>
 #include <cuda_runtime.h>
-#include "cuda_utils.h"
+#include "CudaUtils.h"
 
 template <class T>
 struct PerformanceResult {

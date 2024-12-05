@@ -1,13 +1,17 @@
 //
 // Created by wookie on 11/22/24.
 //
-#include "cuda_utils.h"
+#include "CudaUtils.h"
 #include <iostream>
 
 #include <cuda_runtime.h>
 #include <cstdio>
 
-void cudaDeviceInfo() {
+void check_last_cuda_error(char const* file, int line)
+{
+}
+
+void CudaUtils::printCudaDeviceInfo() {
     int deviceCount = 0;
     cudaGetDeviceCount(&deviceCount);
     printf("\nNumber of CUDA Devices: %d\n", deviceCount);
@@ -84,10 +88,8 @@ void cudaDeviceInfo() {
     }
 }
 
-void check_cuda_error(cudaError_t err, char const* func, char const* file, int line)
-{
-    if (err != cudaSuccess)
-    {
+void CudaUtils::check_cuda_error(cudaError_t err, const char *func, const char *file, int line) {
+    if (err != cudaSuccess) {
         std::cerr << "CUDA Runtime Error at: " << file << ":" << line
                   << std::endl;
         std::cerr << cudaGetErrorString(err) << " " << func << std::endl;
@@ -95,8 +97,7 @@ void check_cuda_error(cudaError_t err, char const* func, char const* file, int l
     }
 }
 
-void check_last_cuda_error(char const* file, int line)
-{
+void CudaUtils::check_last_cuda_error(const char *file, int line) {
     cudaError_t const err{cudaGetLastError()};
     if (err != cudaSuccess)
     {

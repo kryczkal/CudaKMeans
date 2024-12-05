@@ -7,7 +7,7 @@
 
 #include <iostream>
 #include <cuda_runtime.h>
-#include "cuda_utils.h"
+#include "CudaUtils.h"
 
 /*
  * Wrappers that will run the k-means algorithm:
@@ -16,9 +16,9 @@
  * 3. Repeat 1-2 until convergence or max iterations
  */
 
-void cpu_kmeans(float* data, float* centroids, int* labels, int n, int d, int k, int max_iter = 100);
-
-void naive_kmeans(float* data, float* centroids, int* labels, int n, int d, int k, int max_iter = 100);
+void cpu_kmeans(float* data, float* centroids, int* labels, int64_t n, int64_t d, int64_t k, int max_iter = 100);
+void naive_kmeans(float* data, float* centroids, int* labels, int64_t n, int64_t d, int64_t k, int max_iter = 100);
+void reduction_v1_kmeans(float* data, float* centroids, int* labels, int64_t n, int64_t d, int64_t k, int max_iter = 100);
 
 
 #endif //CUDAKMEANS_WRAPPERS_H
