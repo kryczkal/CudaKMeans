@@ -8,6 +8,16 @@
 #include "GeneralUtils.h"
 #include "CudaUtils.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#elif __linux__
+#include <fstream>
+#include <sstream>
+#include <string>
+#elif __APPLE__
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#endif
 
 // Function to visualize K-means clustering result
 void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, const int* labels, uint64_t N, uint64_t D, uint64_t K,
@@ -235,10 +245,53 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
     delete[] projected_centroids;
 }
 
-bool GeneralUtils::fitsInGlobalMemory(uint64_t mem_size_bytes, uint64_t device_id) {
+bool GeneralUtils::fitsInGpuGlobalMemory(uint64_t mem_size_bytes, uint64_t device_id) {
     cudaDeviceProp prop;
     CHECK_CUDA_ERROR(cudaGetDeviceProperties(&prop, device_id));
     size_t freeMem, totalMem;
     CHECK_CUDA_ERROR(cudaMemGetInfo(&freeMem, &totalMem));
     return mem_size_bytes <= freeMem;
+}
+
+bool GeneralUtils::fitsInRam(uint64_t mem_size_bytes) {
+    return mem_size_bytes <= getTotalRam();
+}
+
+uint64_t GeneralUtils::getTotalRam() {
+#ifdef _WIN32
+    MEMORYSTATUSEX statex;
+        statex.dwLength = sizeof(statex);
+        if (GlobalMemoryStatusEx(&statex)) {
+            return statex.ullTotalPhys;
+        } else {
+            throw std::runtime_error("Failed to query total RAM on Windows.");
+        }
+#elif __linux__
+    std::ifstream meminfo("/proc/meminfo");
+    if (!meminfo) {
+        throw std::runtime_error("Failed to open /proc/meminfo.");
+    }
+
+    std::string line;
+    while (std::getline(meminfo, line)) {
+        std::istringstream iss(line);
+        std::string key;
+        uint64_t value;
+        std::string unit;
+        if (iss >> key >> value >> unit && key == "MemTotal:") {
+            return value * 1024; // Convert from kB to bytes
+        }
+    }
+    throw std::runtime_error("Failed to read MemTotal from /proc/meminfo.");
+#elif __APPLE__
+    uint64_t total_ram;
+        size_t size = sizeof(total_ram);
+        if (sysctlbyname("hw.memsize", &total_ram, &size, nullptr, 0) == 0) {
+            return total_ram;
+        } else {
+            throw std::runtime_error("Failed to query total RAM on macOS.");
+        }
+#else
+        throw std::runtime_error("Unsupported platform.");
+#endif
 }

@@ -6,7 +6,8 @@
 #define CUDAKMEANS_PERFORMANCECLOCK_H
 
 #include <cuda_runtime.h>
-
+#include <unordered_map>
+#include <optional>
 
 enum class MEASURED_PHASE {
     DATA_TRANSFER,
@@ -17,10 +18,11 @@ enum class MEASURED_PHASE {
 };
 
 /*
- * Enables measuring performance of a given kernel across different stages:
+ * Enables measuring performance of different phases:
  * Data transfer
  * Kernel execution
  * Data transfer back
+ * CPU computation
  */
 class PerformanceClock {
 public:
@@ -34,15 +36,10 @@ public:
     void reset();
     void printResults(std::optional<std::string> kernel_name = std::nullopt) const;
 
-    // Public fields
-    double data_transfer_time;
-    double kernel_execution_time;
-    double data_transfer_back_time;
-    double cpu_computation_time;
 private:
     // Private fields
-    enum MEASURED_PHASE current_phase = MEASURED_PHASE::NONE;
-    cudaEvent_t startEvent, stopEvent;
-
+    std::unordered_map<MEASURED_PHASE, cudaEvent_t> startEvents;
+    std::unordered_map<MEASURED_PHASE, double> cumulativeTimes;
 };
+
 #endif //CUDAKMEANS_PERFORMANCECLOCK_H

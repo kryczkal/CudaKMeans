@@ -9,16 +9,24 @@
 
 class GeneralUtils {
 public:
-    /*
-     * Function to check if the given memory size fits into the global memory of the device
+    /**
+     * @brief Function to check if the given memory size fits into the global memory of the device
      * @param mem_size_bytes - size of the memory in bytes
      * @param device_id - ID of the device to check
      * @return true if the memory fits, false otherwise
      */
-    static bool fitsInGlobalMemory(uint64_t mem_size_bytes, uint64_t device_id = 0);
+    static bool fitsInGpuGlobalMemory(uint64_t mem_size_bytes, uint64_t device_id = 0);
 
-    /*
-     * Function to visualize K-means clustering result
+    /**
+     * @brief Function to check if the given memory size fits into the RAM
+     * @param mem_size_bytes - size of the memory in bytes
+     * @return true if the memory fits, false otherwise
+     */
+    static bool fitsInRam(uint64_t mem_size_bytes);
+    static uint64_t getTotalRam();
+
+    /**
+     * @brief Function to visualize K-means clustering result
      * @param data - input data points
      * @param centroids - cluster centroids
      * @param labels - cluster labels

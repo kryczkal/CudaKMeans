@@ -3,71 +3,90 @@
 //
 
 #include <stdexcept>
-#include <optional>
+#include <cstdio>
 #include "PerformanceClock.h"
 #include "CudaUtils.h"
 
 PerformanceClock::PerformanceClock() {
-    CHECK_CUDA_ERROR(cudaEventCreate(&startEvent));
-    CHECK_CUDA_ERROR(cudaEventCreate(&stopEvent));
 }
 
 PerformanceClock::~PerformanceClock() {
-    CHECK_CUDA_ERROR(cudaEventDestroy(startEvent));
-    CHECK_CUDA_ERROR(cudaEventDestroy(stopEvent));
+    // Destroy any remaining start events
+    for (auto &pair : startEvents) {
+        CHECK_CUDA_ERROR(cudaEventDestroy(pair.second));
+    }
+    startEvents.clear();
 }
 
 void PerformanceClock::start(MEASURED_PHASE phase) {
-    if (current_phase != MEASURED_PHASE::NONE) {
-        throw std::runtime_error("Cannot start a new phase before stopping the previous one");
+    if (startEvents.find(phase) != startEvents.end()) {
+        throw std::runtime_error("Cannot start a phase that is already started");
     }
-    current_phase = phase;
+    cudaEvent_t startEvent;
+    CHECK_CUDA_ERROR(cudaEventCreate(&startEvent));
     CHECK_CUDA_ERROR(cudaEventRecord(startEvent));
+    startEvents[phase] = startEvent;
+
+    // Initialize cumulative time for this phase if it doesn't exist
+    if (cumulativeTimes.find(phase) == cumulativeTimes.end()) {
+        cumulativeTimes[phase] = 0.0;
+    }
 }
 
 void PerformanceClock::stop(MEASURED_PHASE phase) {
-    if (current_phase != phase || current_phase == MEASURED_PHASE::NONE) {
+    auto it = startEvents.find(phase);
+    if (it == startEvents.end()) {
         throw std::runtime_error("Cannot stop a phase that was not started");
     }
+    cudaEvent_t startEvent = it->second;
 
+    cudaEvent_t stopEvent;
+    CHECK_CUDA_ERROR(cudaEventCreate(&stopEvent));
     CHECK_CUDA_ERROR(cudaEventRecord(stopEvent));
     CHECK_CUDA_ERROR(cudaEventSynchronize(stopEvent));
-    CHECK_CUDA_ERROR(cudaEventSynchronize(startEvent));
+
     float milliseconds = 0;
     CHECK_CUDA_ERROR(cudaEventElapsedTime(&milliseconds, startEvent, stopEvent));
-    switch (phase) {
-        case MEASURED_PHASE::DATA_TRANSFER:
-            data_transfer_time += milliseconds;
-            break;
-        case MEASURED_PHASE::KERNEL:
-            kernel_execution_time += milliseconds;
-            break;
-        case MEASURED_PHASE::DATA_TRANSFER_BACK:
-            data_transfer_back_time += milliseconds;
-            break;
-        case MEASURED_PHASE::CPU_COMPUTATION:
-            cpu_computation_time += milliseconds;
-            break;
-        default:
-            throw std::runtime_error("Unknown phase");
-    }
-    current_phase = MEASURED_PHASE::NONE;
+
+    cumulativeTimes[phase] += milliseconds;
+
+    CHECK_CUDA_ERROR(cudaEventDestroy(startEvent));
+    CHECK_CUDA_ERROR(cudaEventDestroy(stopEvent));
+
+    startEvents.erase(it);
 }
 
 void PerformanceClock::reset() {
-    data_transfer_time = 0;
-    kernel_execution_time = 0;
-    data_transfer_back_time = 0;
-    current_phase = MEASURED_PHASE::NONE;
+    cumulativeTimes.clear();
+    for (auto &pair : startEvents) {
+        CHECK_CUDA_ERROR(cudaEventDestroy(pair.second));
+    }
+    startEvents.clear();
+}
+
+const char* phaseToString(MEASURED_PHASE phase) {
+    switch (phase) {
+        case MEASURED_PHASE::DATA_TRANSFER:
+            return "Data transfer time";
+        case MEASURED_PHASE::KERNEL:
+            return "Kernel execution time";
+        case MEASURED_PHASE::DATA_TRANSFER_BACK:
+            return "Data transfer back time";
+        case MEASURED_PHASE::CPU_COMPUTATION:
+            return "CPU computation time";
+        default:
+            return "Unknown phase";
+    }
 }
 
 void PerformanceClock::printResults(std::optional<std::string> kernel_name) const {
     if (kernel_name.has_value()) {
         printf("%-25s: %s\n", "Kernel", kernel_name.value().c_str());
     }
-    printf("%-25s: %10.3f ms\n", "Data transfer time", data_transfer_time);
-    printf("%-25s: %10.3f ms\n", "Kernel execution time", kernel_execution_time);
-    printf("%-25s: %10.3f ms\n", "Data transfer back time", data_transfer_back_time);
-    printf("%-25s: %10.3f ms\n", "CPU computation time", cpu_computation_time);
+    for (const auto& pair : cumulativeTimes) {
+        MEASURED_PHASE phase = pair.first;
+        double time = pair.second;
+        const char* phase_name = phaseToString(phase);
+        printf("%-25s: %10.3f ms\n", phase_name, time);
+    }
 }
-

@@ -3,11 +3,12 @@
 //
 
 #include <chrono>
-#include "wrappers.h"
+#include "KMeansWrappers.h"
 #include "kernels.h"
 #include "PerformanceClock.h"
 
-void cpu_kmeans(float *data, float *centroids, int *labels, int64_t n, int64_t d, int64_t k, int64_t max_iter) {
+void KMeansWrappers::Cpu(float *data, float *centroids, int *labels, int64_t n, int64_t d, int64_t k,
+                         int max_iter) {
     printf("Running CPU k-means\n");
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
@@ -73,7 +74,8 @@ void cpu_kmeans(float *data, float *centroids, int *labels, int64_t n, int64_t d
     delete[] counts;
 }
 
-void naive_kmeans(float *data, float *centroids, int *labels, int64_t n, int64_t d, int64_t k, int max_iter) {
+void KMeansWrappers::Naive(float *data, float *centroids, int *labels, int64_t n, int64_t d, int64_t k,
+                           int max_iter) {
     PerformanceClock clock;
     float *d_data, *d_centroids;
     int *d_labels;
@@ -129,7 +131,8 @@ void naive_kmeans(float *data, float *centroids, int *labels, int64_t n, int64_t
     CHECK_CUDA_ERROR(cudaFree(d_changes));
 }
 
-void reduction_v1_kmeans(float *data, float *centroids, int *labels, int64_t n, int64_t d, int64_t k, int max_iter) {
+void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int64_t n, int64_t d, int64_t k,
+                                 int max_iter) {
     PerformanceClock clock;
     float *d_data, *d_centroids;
     int *d_labels, *d_counts;
