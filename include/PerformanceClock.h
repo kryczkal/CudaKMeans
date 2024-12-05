@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 #include <optional>
 #include <unordered_map>
+#include <string>
 
 enum class MEASURED_PHASE
 {
