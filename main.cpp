@@ -13,18 +13,21 @@
 #include "CudaUtils.h"
 #include "GeneralUtils.h"
 #include "KMeansIO.h"
+#include "KMeansValidator.h"
 
 /**
  * @brief Prints the correct usage of the program to the standard error.
  */
 void print_usage() {
     std::cerr << "Usage:\n";
-    std::cerr << "    KMeans data_format computation_method input_file output_file\n";
+    std::cerr << "    KMeans data_format computation_method input_file output_file [-c | compare] [results_file_path]\n";
     std::cerr << "Where:\n";
     std::cerr << "    data_format: txt or bin\n";
     std::cerr << "    computation_method: cpu, gpu1, or gpu2\n";
     std::cerr << "    input_file: path to the input file\n";
     std::cerr << "    output_file: path to the output file\n";
+    std::cerr << "    -c or compare: optional flag to compare results with a ground truth file\n";
+    std::cerr << "    results_file_path: path to the ground truth file .txt\n";
 }
 
 /**
@@ -40,7 +43,7 @@ enum class DataFormat { TXT, BIN };
 enum class ComputationMethod { CPU, GPU1, GPU2 };
 
 int main(int argc, char* argv[]) {
-    if (argc != 5) {
+    if (argc != 5 && argc != 7) {
         print_usage();
         return EXIT_FAILURE;
     }
@@ -49,6 +52,21 @@ int main(int argc, char* argv[]) {
     std::string computation_method_str = argv[2];
     std::string input_file = argv[3];
     std::string output_file = argv[4];
+
+    // Parse optional arguments
+    bool compare_results = false;
+    std::string results_file_path;
+    if (argc == 7) {
+        std::string flag = argv[5];
+        if (flag == "-c" || flag == "compare") {
+            compare_results = true;
+            results_file_path = argv[6];
+        } else {
+            std::cerr << "Error: invalid flag\n";
+            print_usage();
+            return EXIT_FAILURE;
+        }
+    }
 
     // Map strings to enums for data formats
     std::unordered_map<std::string, DataFormat> data_format_map = {
@@ -95,7 +113,7 @@ int main(int argc, char* argv[]) {
 
     // Load data
     float* data = nullptr;
-    int64_t N = 0, d = 0, k = 0;
+    int N = 0, d = 0, k = 0;
     bool success = false;
     if (data_format == DataFormat::TXT) {
         success = KMeansIO::LoadDataFromTextFile(input_file, data, N, d, k);
@@ -125,12 +143,14 @@ int main(int argc, char* argv[]) {
     std::cout << "Allocating memory for centroids and labels\n";
 
     // Allocate centroids and labels
-    auto* centroids = static_cast<float*>(malloc(k * d * sizeof(float)));
-    int* labels = static_cast<int*>(malloc(N * sizeof(int)));
+    auto* centroids = new float[k * d];
+    int* labels = new int[N];
 
-    if (!centroids || !labels) {
-        std::cerr << "Failed to allocate memory for centroids or labels\n";
+    if (centroids == nullptr || labels == nullptr) {
+        std::cerr << "Failed to allocate memory for centroids and labels\n";
         free(data);
+        free(centroids);
+        free(labels);
         return EXIT_FAILURE;
     }
 
@@ -151,7 +171,7 @@ int main(int argc, char* argv[]) {
             KMeansWrappers::Cpu(data, centroids, labels, N, d, k, max_iterations);
             break;
         case ComputationMethod::GPU1:
-            KMeansWrappers::ReductionV1(data, centroids, labels, N, d, k, max_iterations);
+            KMeansWrappers::Naive(data, centroids, labels, N, d, k, max_iterations);
             break;
         case ComputationMethod::GPU2:
             KMeansWrappers::ReductionV1(data, centroids, labels, N, d, k, max_iterations);
@@ -180,6 +200,16 @@ int main(int argc, char* argv[]) {
     free(data);
     free(centroids);
     free(labels);
+
+    // Compare results if requested
+    if (compare_results) {
+        std::cout << "Comparing results with ground truth file: " << results_file_path << std::endl;
+        if (!KMeansValidator::ValidateResults(results_file_path, output_file, d, k)) {
+            std::cerr << "Results do not match\n";
+            return EXIT_FAILURE;
+        }
+        std::cout << "Results match\n";
+    }
 
     std::cout << "Done\n";
     return EXIT_SUCCESS;

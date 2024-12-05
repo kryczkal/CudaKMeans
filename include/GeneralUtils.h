@@ -15,15 +15,15 @@ public:
      * @param device_id - ID of the device to check
      * @return true if the memory fits, false otherwise
      */
-    static bool fitsInGpuGlobalMemory(uint64_t mem_size_bytes, uint64_t device_id = 0);
+    static bool fitsInGpuGlobalMemory(uint mem_size_bytes, uint device_id = 0);
 
     /**
      * @brief Function to check if the given memory size fits into the RAM
      * @param mem_size_bytes - size of the memory in bytes
      * @return true if the memory fits, false otherwise
      */
-    static bool fitsInRam(uint64_t mem_size_bytes);
-    static uint64_t getTotalRam();
+    [[maybe_unused]] static bool fitsInRam(uint mem_size_bytes);
+    static uint getTotalRam();
 
     /**
      * @brief Function to visualize K-means clustering result
@@ -39,8 +39,7 @@ public:
      * The function visualizes the K-means clustering result by projecting the data points and centroids to 2D space
      * using PCA and then mapping the projected points to a grid.
      */
-    static void visualizeKmeans(const float* data, const float* centroids, const int* labels, uint64_t N, uint64_t D, uint64_t K,
-                                int width = 80, int height = 24);
+    [[maybe_unused]] static void visualizeKmeans(const float* data, const float* centroids, const int* labels, uint N, uint D, uint K);
 };
 
 #endif //CUDAKMEANS_GENERALUTILS_H

@@ -18,9 +18,9 @@
 
 class KMeansWrappers {
 public:
-    static void Cpu(float* data, float* centroids, int* labels, int64_t n, int64_t d, int64_t k, int max_iter = 100);
-    static void Naive(float* data, float* centroids, int* labels, int64_t n, int64_t d, int64_t k, int max_iter = 100);
-    static void ReductionV1(float* data, float* centroids, int* labels, int64_t n, int64_t d, int64_t k, int max_iter = 100);
+    static void Cpu(const float* data, float* centroids, int* labels, int n, int d, int k, int max_iter = 100);
+    static void Naive(float* data, float* centroids, int* labels, int n, int d, int k, int max_iter = 100);
+    static void ReductionV1(float* data, float* centroids, int* labels, int n, int d, int k, int max_iter = 100);
 };
 
 

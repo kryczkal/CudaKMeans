@@ -7,8 +7,7 @@
 #include "PerformanceClock.h"
 #include "CudaUtils.h"
 
-PerformanceClock::PerformanceClock() {
-}
+PerformanceClock::PerformanceClock() = default;
 
 PerformanceClock::~PerformanceClock() {
     // Destroy any remaining start events
@@ -56,7 +55,7 @@ void PerformanceClock::stop(MEASURED_PHASE phase) {
     startEvents.erase(it);
 }
 
-void PerformanceClock::reset() {
+[[maybe_unused]] void PerformanceClock::reset() {
     cumulativeTimes.clear();
     for (auto &pair : startEvents) {
         CHECK_CUDA_ERROR(cudaEventDestroy(pair.second));

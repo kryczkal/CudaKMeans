@@ -1,16 +1,18 @@
 cmake_minimum_required(VERSION 3.12)
 project(CudaKMeans LANGUAGES CXX CUDA)
 
-cmake_policy(SET CMP0146 NEW) # Use the modern CUDA support
-cmake_policy(SET CMP0104 NEW) # Require explicit CUDA architectures
+#cmake_policy(SET CMP0146 NEW) # Use the modern CUDA support
+#cmake_policy(SET CMP0104 NEW) # Require explicit CUDA architectures
 
 set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD_REQUIRED OFF)
 
 set(CMAKE_CUDA_STANDARD 20)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD_REQUIRED OFF)
 
-set(CMAKE_CUDA_ARCHITECTURES 89)
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 75)
+endif()
 
 include_directories(include)
 

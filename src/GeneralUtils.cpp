@@ -4,68 +4,58 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
-#include <cinttypes>
 #include "GeneralUtils.h"
 #include "CudaUtils.h"
 
-#ifdef _WIN32
-#include <windows.h>
-#elif __linux__
-#include <fstream>
-#include <sstream>
-#include <string>
-#elif __APPLE__
-#include <sys/types.h>
-#include <sys/sysctl.h>
-#endif
+static constexpr int width = 80;
+static constexpr int height = 40;
 
 // Function to visualize K-means clustering result
-void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, const int* labels, uint64_t N, uint64_t D, uint64_t K,
-                                   int width, int height) {
+[[maybe_unused]] void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, const int* labels, uint N, uint D, uint K) {
     // Compute mean vector
-    float* mean = new float[D]();
-    for (uint64_t n = 0; n < N; ++n)
-        for (uint64_t d = 0; d < D; ++d)
+    auto* mean = new float[D]();
+    for (uint n = 0; n < N; ++n)
+        for (uint d = 0; d < D; ++d)
             mean[d] += data[n * D + d];
-    for (uint64_t d = 0; d < D; ++d)
-        mean[d] /= N;
+    for (uint d = 0; d < D; ++d)
+        mean[d] /= (float)N;
 
     // Center the data
-    float* centered_data = new float[N * D];
-    for (uint64_t n = 0; n < N; ++n)
-        for (uint64_t d = 0; d < D; ++d)
+    auto* centered_data = new float[N * D];
+    for (uint n = 0; n < N; ++n)
+        for (uint d = 0; d < D; ++d)
             centered_data[n * D + d] = data[n * D + d] - mean[d];
 
     // Center the centroids
-    float* centered_centroids = new float[K * D];
-    for (uint64_t k = 0; k < K; ++k)
-        for (uint64_t d = 0; d < D; ++d)
+    auto* centered_centroids = new float[K * D];
+    for (uint k = 0; k < K; ++k)
+        for (uint d = 0; d < D; ++d)
             centered_centroids[k * D + d] = centroids[k * D + d] - mean[d];
 
     // Compute covariance matrix
-    float* cov = new float[D * D]();
-    for (uint64_t i = 0; i < D; ++i)
-        for (uint64_t j = 0; j < D; ++j)
-            for (uint64_t n = 0; n < N; ++n)
+    auto* cov = new float[D * D]();
+    for (uint i = 0; i < D; ++i)
+        for (uint j = 0; j < D; ++j)
+            for (uint n = 0; n < N; ++n)
                 cov[i * D + j] += centered_data[n * D + i] * centered_data[n * D + j];
-    for (uint64_t i = 0; i < D * D; ++i)
-        cov[i] /= (N - 1);
+    for (uint i = 0; i < D * D; ++i)
+        cov[i] /= (float)(N - 1);
 
     // Eigenvalue decomposition using Jacobi method
-    float* eigenvectors = new float[D * D]();
-    for (uint64_t i = 0; i < D; ++i)
+    auto* eigenvectors = new float[D * D]();
+    for (uint i = 0; i < D; ++i)
         eigenvectors[i * D + i] = 1.0f;
-    float* eigenvalues = new float[D];
-    for (uint64_t i = 0; i < D; ++i)
+    auto* eigenvalues = new float[D];
+    for (uint i = 0; i < D; ++i)
         eigenvalues[i] = cov[i * D + i];
 
     const int max_sweeps = 100;
     const float epsilon = 1e-6f;
     for (int sweep = 0; sweep < max_sweeps; ++sweep) {
         float max_offdiag = 0.0f;
-        uint64_t p = 0, q = 0;
-        for (uint64_t i = 0; i < D - 1; ++i) {
-            for (uint64_t j = i + 1; j < D; ++j) {
+        uint p = 0, q = 0;
+        for (uint i = 0; i < D - 1; ++i) {
+            for (uint j = i + 1; j < D; ++j) {
                 float offdiag = fabsf(cov[i * D + j]);
                 if (offdiag > max_offdiag) {
                     max_offdiag = offdiag;
@@ -81,7 +71,7 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
         float sin_phi = sinf(phi);
 
         // Rotate covariance matrix
-        for (uint64_t i = 0; i < D; ++i) {
+        for (uint i = 0; i < D; ++i) {
             float c_ip = cov[i * D + p];
             float c_iq = cov[i * D + q];
             cov[i * D + p] = c_ip * cos_phi - c_iq * sin_phi;
@@ -98,21 +88,21 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
         cov[q * D + p] = 0.0f;
 
         // Rotate eigenvectors
-        for (uint64_t i = 0; i < D; ++i) {
+        for (uint i = 0; i < D; ++i) {
             float e_ip = eigenvectors[i * D + p];
             float e_iq = eigenvectors[i * D + q];
             eigenvectors[i * D + p] = e_ip * cos_phi - e_iq * sin_phi;
             eigenvectors[i * D + q] = e_ip * sin_phi + e_iq * cos_phi;
         }
     }
-    for (uint64_t i = 0; i < D; ++i)
+    for (uint i = 0; i < D; ++i)
         eigenvalues[i] = cov[i * D + i];
 
     // Find indices of the two largest eigenvalues
-    uint64_t idx1 = 0, idx2 = 1;
+    uint idx1 = 0, idx2 = 1;
     if (eigenvalues[idx2] > eigenvalues[idx1])
         std::swap(idx1, idx2);
-    for (uint64_t i = 2; i < D; ++i) {
+    for (uint i = 2; i < D; ++i) {
         if (eigenvalues[i] > eigenvalues[idx1]) {
             idx2 = idx1;
             idx1 = i;
@@ -122,18 +112,18 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
     }
 
     // Get the top two eigenvectors
-    float* evec1 = new float[D];
-    float* evec2 = new float[D];
-    for (uint64_t i = 0; i < D; ++i) {
+    auto* evec1 = new float[D];
+    auto* evec2 = new float[D];
+    for (uint i = 0; i < D; ++i) {
         evec1[i] = eigenvectors[i * D + idx1];
         evec2[i] = eigenvectors[i * D + idx2];
     }
 
     // Project the centered data onto the top two eigenvectors
-    float* projected_data = new float[N * 2];
-    for (uint64_t n = 0; n < N; ++n) {
+    auto* projected_data = new float[N * 2];
+    for (uint n = 0; n < N; ++n) {
         float proj1 = 0.0f, proj2 = 0.0f;
-        for (uint64_t d = 0; d < D; ++d) {
+        for (uint d = 0; d < D; ++d) {
             proj1 += centered_data[n * D + d] * evec1[d];
             proj2 += centered_data[n * D + d] * evec2[d];
         }
@@ -142,10 +132,10 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
     }
 
     // Project the centered centroids
-    float* projected_centroids = new float[K * 2];
-    for (uint64_t k = 0; k < K; ++k) {
+    auto* projected_centroids = new float[K * 2];
+    for (uint k = 0; k < K; ++k) {
         float proj1 = 0.0f, proj2 = 0.0f;
-        for (uint64_t d = 0; d < D; ++d) {
+        for (uint d = 0; d < D; ++d) {
             proj1 += centered_centroids[k * D + d] * evec1[d];
             proj2 += centered_centroids[k * D + d] * evec2[d];
         }
@@ -158,7 +148,7 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
     // Find min and max of projected data
     float min_x = projected_data[0], max_x = projected_data[0];
     float min_y = projected_data[1], max_y = projected_data[1];
-    for (uint64_t n = 0; n < N; ++n) {
+    for (uint n = 0; n < N; ++n) {
         float x = projected_data[n * 2 + 0];
         float y = projected_data[n * 2 + 1];
         min_x = std::min(min_x, x);
@@ -166,7 +156,7 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
         min_y = std::min(min_y, y);
         max_y = std::max(max_y, y);
     }
-    for (uint64_t k = 0; k < K; ++k) {
+    for (uint k = 0; k < K; ++k) {
         float x = projected_centroids[k * 2 + 0];
         float y = projected_centroids[k * 2 + 1];
         min_x = std::min(min_x, x);
@@ -176,8 +166,8 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
     }
 
     // Compute scale factors
-    float scale_x = (max_x - min_x) > 0 ? (width - 1) / (max_x - min_x) : 1.0f;
-    float scale_y = (max_y - min_y) > 0 ? (height - 1) / (max_y - min_y) : 1.0f;
+    float scale_x = (max_x - min_x) > 0 ? (float)(width - 1) / (max_x - min_x) : 1.0f;
+    float scale_y = (max_y - min_y) > 0 ? (float)(height - 1) / (max_y - min_y) : 1.0f;
 
     // Initialize grid
     char grid[height][width];
@@ -197,7 +187,7 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
     int num_colors = sizeof(colors) / sizeof(colors[0]);
 
     // Map data points to grid
-    for (uint64_t n = 0; n < N; ++n) {
+    for (uint n = 0; n < N; ++n) {
         float x = projected_data[n * 2 + 0];
         float y = projected_data[n * 2 + 1];
         int grid_x = static_cast<int>((x - min_x) * scale_x);
@@ -209,7 +199,7 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
     }
 
     // Map centroids to grid
-    for (uint64_t k = 0; k < K; ++k) {
+    for (uint k = 0; k < K; ++k) {
         float x = projected_centroids[k * 2 + 0];
         float y = projected_centroids[k * 2 + 1];
         int grid_x = static_cast<int>((x - min_x) * scale_x);
@@ -245,53 +235,10 @@ void GeneralUtils::visualizeKmeans(const float* data, const float* centroids, co
     delete[] projected_centroids;
 }
 
-bool GeneralUtils::fitsInGpuGlobalMemory(uint64_t mem_size_bytes, uint64_t device_id) {
-    cudaDeviceProp prop;
+bool GeneralUtils::fitsInGpuGlobalMemory(uint mem_size_bytes, uint device_id) {
+    cudaDeviceProp prop{};
     CHECK_CUDA_ERROR(cudaGetDeviceProperties(&prop, device_id));
     size_t freeMem, totalMem;
     CHECK_CUDA_ERROR(cudaMemGetInfo(&freeMem, &totalMem));
     return mem_size_bytes <= freeMem;
-}
-
-bool GeneralUtils::fitsInRam(uint64_t mem_size_bytes) {
-    return mem_size_bytes <= getTotalRam();
-}
-
-uint64_t GeneralUtils::getTotalRam() {
-#ifdef _WIN32
-    MEMORYSTATUSEX statex;
-        statex.dwLength = sizeof(statex);
-        if (GlobalMemoryStatusEx(&statex)) {
-            return statex.ullTotalPhys;
-        } else {
-            throw std::runtime_error("Failed to query total RAM on Windows.");
-        }
-#elif __linux__
-    std::ifstream meminfo("/proc/meminfo");
-    if (!meminfo) {
-        throw std::runtime_error("Failed to open /proc/meminfo.");
-    }
-
-    std::string line;
-    while (std::getline(meminfo, line)) {
-        std::istringstream iss(line);
-        std::string key;
-        uint64_t value;
-        std::string unit;
-        if (iss >> key >> value >> unit && key == "MemTotal:") {
-            return value * 1024; // Convert from kB to bytes
-        }
-    }
-    throw std::runtime_error("Failed to read MemTotal from /proc/meminfo.");
-#elif __APPLE__
-    uint64_t total_ram;
-        size_t size = sizeof(total_ram);
-        if (sysctlbyname("hw.memsize", &total_ram, &size, nullptr, 0) == 0) {
-            return total_ram;
-        } else {
-            throw std::runtime_error("Failed to query total RAM on macOS.");
-        }
-#else
-        throw std::runtime_error("Unsupported platform.");
-#endif
 }

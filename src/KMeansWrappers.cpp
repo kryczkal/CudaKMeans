@@ -7,13 +7,13 @@
 #include "kernels.h"
 #include "PerformanceClock.h"
 
-void KMeansWrappers::Cpu(float *data, float *centroids, int *labels, int64_t n, int64_t d, int64_t k,
+void KMeansWrappers::Cpu(const float *data, float *centroids, int *labels, int n, int d, int k,
                          int max_iter) {
     printf("Running CPU k-means\n");
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
-    float *new_centroids = new float[k * d]();
-    int *counts = new int[k]();
+    auto new_centroids = new float[k * d]();
+    auto counts = new float[k]();
 
     bool changes = true;
     for (int i = 0; i < max_iter && changes; ++i) {
@@ -49,7 +49,7 @@ void KMeansWrappers::Cpu(float *data, float *centroids, int *labels, int64_t n, 
                 continue;
             }
             for (int l = 0; l < d; ++l) {
-                new_centroids[j * d + l] /= counts[j];
+                new_centroids[j * d + l] /= (float)counts[j];
             }
         }
 
@@ -74,7 +74,7 @@ void KMeansWrappers::Cpu(float *data, float *centroids, int *labels, int64_t n, 
     delete[] counts;
 }
 
-void KMeansWrappers::Naive(float *data, float *centroids, int *labels, int64_t n, int64_t d, int64_t k,
+void KMeansWrappers::Naive(float *data, float *centroids, int *labels, int n, int d, int k,
                            int max_iter) {
     PerformanceClock clock;
     float *d_data, *d_centroids;
@@ -131,7 +131,7 @@ void KMeansWrappers::Naive(float *data, float *centroids, int *labels, int64_t n
     CHECK_CUDA_ERROR(cudaFree(d_changes));
 }
 
-void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int64_t n, int64_t d, int64_t k,
+void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int n, int d, int k,
                                  int max_iter) {
     PerformanceClock clock;
     float *d_data, *d_centroids;
@@ -158,6 +158,10 @@ void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int
     size_t shared_mem_size_label = k * d * sizeof(float);
     size_t shared_mem_size_update = (k * d * sizeof(float)) + (k * sizeof(int));
 
+    auto h_counts = new int[k];
+
+    auto h_centroids = new float[k * d];
+
     for (int iter = 0; iter < max_iter; ++iter) {
         // Labeling step
         clock.start(MEASURED_PHASE::KERNEL);
@@ -177,11 +181,8 @@ void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int
 
         // Update centroids
         clock.start(MEASURED_PHASE::DATA_TRANSFER_BACK);
-            // Copy counts from device to host
-        int *h_counts = new int[k];
+        // Copy counts and centroids to host
         cudaMemcpy(h_counts, d_counts, counts_size, cudaMemcpyDeviceToHost);
-            // Copy centroids from device to host
-        float *h_centroids = new float[k * d];
         cudaMemcpy(h_centroids, d_centroids, centroids_size, cudaMemcpyDeviceToHost);
         clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
 
@@ -190,7 +191,7 @@ void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int
         for (int i = 0; i < k; ++i) {
             if (h_counts[i] > 0) {
                 for (int j = 0; j < d; ++j) {
-                    h_centroids[i * d + j] /= h_counts[i];
+                    h_centroids[i * d + j] /= (float)h_counts[i];
                 }
             }
         }
@@ -200,9 +201,6 @@ void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int
         clock.start(MEASURED_PHASE::DATA_TRANSFER);
         cudaMemcpy(d_centroids, h_centroids, centroids_size, cudaMemcpyHostToDevice);
         clock.stop(MEASURED_PHASE::DATA_TRANSFER);
-
-        delete[] h_counts;
-        delete[] h_centroids;
     }
 
     // Copy final labels and centroids back to host
@@ -212,6 +210,9 @@ void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int
     clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
 
     clock.printResults("Reduction v1 k-means");
+
+    delete[] h_counts;
+    delete[] h_centroids;
 
     cudaFree(d_data);
     cudaFree(d_centroids);

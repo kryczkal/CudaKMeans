@@ -3,124 +3,68 @@
 //
 
 #include "KMeansValidator.h"
-#include <fstream>
-#include <sstream>
-#include <iostream>
+#include "KMeansIO.h"
 #include <cmath>
 
-/**
- * @brief Helper function to read centroids and labels from a file.
- * @param filename The file to read.
- * @param centroids Vector to store the centroids.
- * @param labels Vector to store the labels.
- * @return True if the file was successfully read, false otherwise.
- */
-bool KMeansValidator::LoadOutput(const std::string& filename, std::vector<std::vector<float>>& centroids, std::vector<int>& labels) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << filename << std::endl;
+bool
+KMeansValidator::ValidateResults(const std::string &truthFile, const std::string &testedFile, int d, int k) {
+    float* centroids1 = nullptr;
+    int* labels1 = nullptr;
+    int N1 = 0;
+
+    float* centroids2 = nullptr;
+    int* labels2 = nullptr;
+    int N2 = 0;
+
+    // Load results from the first file
+    if (!KMeansIO::LoadResultsFromTextFile(truthFile, centroids1, labels1, N1, d, k)) {
+        fprintf(stderr, "Failed to load results from %s\n", truthFile.c_str());
         return false;
     }
 
-    std::string line;
-    bool readingCentroids = true;
-
-    while (std::getline(file, line)) {
-        std::istringstream iss(line);
-
-        if (readingCentroids) {
-            // Attempt to read a line of centroid coordinates
-            std::vector<float> centroid;
-            float value;
-            while (iss >> value) {
-                centroid.push_back(value);
-            }
-
-            if (centroid.empty()) {
-                readingCentroids = false; // Switch to reading labels
-            } else {
-                centroids.push_back(centroid);
-            }
-        }
-
-        if (!readingCentroids) {
-            // Read labels
-            int label;
-            if (iss >> label) {
-                labels.push_back(label);
-            }
-        }
-    }
-
-    file.close();
-    return true;
-}
-
-bool KMeansValidator::LoadExpectedOutput(const std::string& filename) {
-    return LoadOutput(filename, expectedCentroids, expectedLabels);
-}
-
-bool KMeansValidator::LoadComputedOutput(const std::string& filename) {
-    return LoadOutput(filename, computedCentroids, computedLabels);
-}
-
-bool KMeansValidator::CompareCentroids() const {
-    if (expectedCentroids.size() != computedCentroids.size()) {
-        std::cerr << "Centroid count mismatch: "
-                  << "expected " << expectedCentroids.size() << ", "
-                  << "computed " << computedCentroids.size() << std::endl;
+    // Load results from the second file
+    if (!KMeansIO::LoadResultsFromTextFile(testedFile, centroids2, labels2, N2, d, k)) {
+        fprintf(stderr, "Failed to load results from %s\n", testedFile.c_str());
+        delete[] centroids1;
+        delete[] labels1;
         return false;
     }
 
-    const float tolerance = 1e-4f; // Tolerance for floating-point comparisons
-    for (size_t i = 0; i < expectedCentroids.size(); ++i) {
-        if (expectedCentroids[i].size() != computedCentroids[i].size()) {
-            std::cerr << "Centroid dimension mismatch at index " << i << std::endl;
-            return false;
-        }
-
-        for (size_t j = 0; j < expectedCentroids[i].size(); ++j) {
-            float diff = std::fabs(expectedCentroids[i][j] - computedCentroids[i][j]);
-            if (diff > tolerance) {
-                std::cerr << "Centroid value mismatch at index (" << i << ", " << j << "): "
-                          << "expected " << expectedCentroids[i][j] << ", "
-                          << "computed " << computedCentroids[i][j] << ", "
-                          << "difference " << diff << std::endl;
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-bool KMeansValidator::CompareLabels() const {
-    if (expectedLabels.size() != computedLabels.size()) {
-        std::cerr << "Label count mismatch: "
-                  << "expected " << expectedLabels.size() << ", "
-                  << "computed " << computedLabels.size() << std::endl;
+    // Check if the number of data points is the same
+    if (N1 != N2) {
+        fprintf(stderr, "Mismatch in number of data points: %d vs %d\n", N2, N1);
+        delete[] centroids1;
+        delete[] labels1;
+        delete[] centroids2;
+        delete[] labels2;
         return false;
     }
 
-    for (size_t i = 0; i < expectedLabels.size(); ++i) {
-        if (expectedLabels[i] != computedLabels[i]) {
-            std::cerr << "Label mismatch at index " << i << ": "
-                      << "expected " << expectedLabels[i] << ", "
-                      << "computed " << computedLabels[i] << std::endl;
-            return false;
+    // Compare centroids
+    double centroid_diff = 0.0;
+    for (int i = 0; i < k * d; ++i) {
+        double diff = centroids1[i] - centroids2[i];
+        centroid_diff += diff * diff;
+    }
+    centroid_diff = std::sqrt(centroid_diff);
+
+    // Compare labels
+    int label_mismatches = 0;
+    for (int i = 0; i < N1; ++i) {
+        if (labels1[i] != labels2[i]) {
+            label_mismatches++;
         }
     }
-    return true;
-}
 
-bool KMeansValidator::CompareOutputs() const {
-    bool centroidsMatch = CompareCentroids();
-    bool labelsMatch = CompareLabels();
+    // Output the differences
+    printf("Total centroid difference (Euclidean distance): %f\n", centroid_diff);
+    printf("Number of label mismatches: %d out of %d\n", label_mismatches, N1);
 
-    if (centroidsMatch && labelsMatch) {
-        std::cout << "Validation successful: outputs match." << std::endl;
-        return true;
-    } else {
-        std::cerr << "Validation failed: outputs do not match." << std::endl;
-        return false;
-    }
+    // Clean up
+    delete[] centroids1;
+    delete[] labels1;
+    delete[] centroids2;
+    delete[] labels2;
+
+    return label_mismatches == 0;
 }

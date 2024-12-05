@@ -33,7 +33,8 @@ public:
     // Public methods
     void start(MEASURED_PHASE phase);
     void stop(MEASURED_PHASE phase);
-    void reset();
+
+    [[maybe_unused]] void reset();
     void printResults(std::optional<std::string> kernel_name = std::nullopt) const;
 
 private:
