@@ -5,8 +5,8 @@
 #ifndef CUDAKMEANS_KMEANSIO_H
 #define CUDAKMEANS_KMEANSIO_H
 
-#include <string>
 #include <cstdint>
+#include <string>
 
 /**
  * @class KMeansIO
@@ -15,9 +15,10 @@
  * This class provides methods for loading data in both text and binary formats and writing results
  * in the specified text format for the K-Means algorithm.
  */
-class KMeansIO {
-public:
-    KMeansIO() = delete;
+class KMeansIO
+{
+    public:
+    KMeansIO()  = delete;
     ~KMeansIO() = delete;
 
     /**
@@ -29,7 +30,7 @@ public:
      * @param k The number of clusters (output parameter).
      * @return True if the data was successfully loaded, false otherwise.
      */
-    static bool LoadDataFromTextFile(const std::string& filename, float*& data, int& N, int& d, int& k);
+    static bool LoadDataFromTextFile(const std::string &filename, float *&data, int &N, int &d, int &k);
 
     /**
      * @brief Loads data from a binary file.
@@ -40,7 +41,7 @@ public:
      * @param k The number of clusters (output parameter).
      * @return True if the data was successfully loaded, false otherwise.
      */
-    static bool LoadDataFromBinaryFile(const std::string& filename, float*& data, int& N, int& d, int& k);
+    static bool LoadDataFromBinaryFile(const std::string &filename, float *&data, int &N, int &d, int &k);
 
     /**
      * @brief Writes the results to a text file.
@@ -52,7 +53,8 @@ public:
      * @param k The number of clusters.
      * @return True if the results were successfully written, false otherwise.
      */
-    static bool WriteResultsToTextFile(const std::string& filename, const float* centroids, const int* labels, int N, int d, int k);
+    static bool
+    WriteResultsToTextFile(const std::string &filename, const float *centroids, const int *labels, int N, int d, int k);
 
     /**
      * @brief Loads the results from a text file.
@@ -64,8 +66,8 @@ public:
      * @param k The number of clusters (input parameter).
      * @return True if the results were successfully loaded, false otherwise.
      */
-    static bool LoadResultsFromTextFile(const std::string& filename, float*& centroids, int*& labels, int& N, int d, int k);
+    static bool
+    LoadResultsFromTextFile(const std::string &filename, float *&centroids, int *&labels, int &N, int d, int k);
 };
 
-
-#endif //CUDAKMEANS_KMEANSIO_H
+#endif // CUDAKMEANS_KMEANSIO_H

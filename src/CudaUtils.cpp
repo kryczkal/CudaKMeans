@@ -4,23 +4,24 @@
 #include "CudaUtils.h"
 #include <iostream>
 
-#include <cuda_runtime.h>
 #include <cstdio>
+#include <cuda_runtime.h>
 
-void check_last_cuda_error(char const* file, int line)
+void check_last_cuda_error(char const *file, int line) {}
+
+void CudaUtils::printCudaDeviceInfo()
 {
-}
-
-void CudaUtils::printCudaDeviceInfo() {
     int deviceCount = 0;
     cudaGetDeviceCount(&deviceCount);
     printf("\nNumber of CUDA Devices: %d\n", deviceCount);
-    if (deviceCount == 0) {
+    if (deviceCount == 0)
+    {
         printf("No CUDA devices found.\n");
         return;
     }
 
-    for (int device = 0; device < deviceCount; ++device) {
+    for (int device = 0; device < deviceCount; ++device)
+    {
         cudaDeviceProp prop;
         cudaGetDeviceProperties(&prop, device);
 
@@ -44,40 +45,50 @@ void CudaUtils::printCudaDeviceInfo() {
         printf("  Registers / Block             : %d\n", prop.regsPerBlock);
         printf("  Registers / Multiprocessor    : %d\n", prop.regsPerMultiprocessor);
         printf("  ----------------------------\n");
-        printf("  Max Grid Size                 : (%d, %d, %d)\n", prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
-        printf("  Max Block Dim                 : (%d, %d, %d)\n", prop.maxThreadsDim[0], prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
+        printf(
+            "  Max Grid Size                 : (%d, %d, %d)\n", prop.maxGridSize[0], prop.maxGridSize[1],
+            prop.maxGridSize[2]
+        );
+        printf(
+            "  Max Block Dim                 : (%d, %d, %d)\n", prop.maxThreadsDim[0], prop.maxThreadsDim[1],
+            prop.maxThreadsDim[2]
+        );
         printf("  ----------------------------\n");
 
         // Calculating theoretical maximum FLOPS
         double peakFLOPS = 0.0;
-        if (prop.major >= 2) { // Fermi and later
+        if (prop.major >= 2)
+        { // Fermi and later
             int cudaCoresPerSM = 0;
-            switch (prop.major) {
-                case 2: // Fermi
-                    cudaCoresPerSM = prop.minor == 0 ? 32 : 48;
-                    break;
-                case 3: // Kepler
-                    cudaCoresPerSM = 192;
-                    break;
-                case 5: // Maxwell
-                    cudaCoresPerSM = 128;
-                    break;
-                case 6: // Pascal
-                    cudaCoresPerSM = (prop.minor == 1 || prop.minor == 2) ? 128 : 64;
-                    break;
-                case 7: // Volta and Turing
-                    cudaCoresPerSM = 64;
-                    break;
-                case 8: // Ampere
-                    cudaCoresPerSM = (prop.minor == 0) ? 64 : 128;
-                    break;
-                default:
-                    cudaCoresPerSM = 64; // Estimate for future architectures
-                    break;
+            switch (prop.major)
+            {
+            case 2: // Fermi
+                cudaCoresPerSM = prop.minor == 0 ? 32 : 48;
+                break;
+            case 3: // Kepler
+                cudaCoresPerSM = 192;
+                break;
+            case 5: // Maxwell
+                cudaCoresPerSM = 128;
+                break;
+            case 6: // Pascal
+                cudaCoresPerSM = (prop.minor == 1 || prop.minor == 2) ? 128 : 64;
+                break;
+            case 7: // Volta and Turing
+                cudaCoresPerSM = 64;
+                break;
+            case 8: // Ampere
+                cudaCoresPerSM = (prop.minor == 0) ? 64 : 128;
+                break;
+            default:
+                cudaCoresPerSM = 64; // Estimate for future architectures
+                break;
             }
             peakFLOPS = 2.0 * prop.multiProcessorCount * cudaCoresPerSM * (prop.clockRate * 1e3);
             printf("  Theoretical Peak FLOPS        : %.2f GFLOPS\n", peakFLOPS / 1e9);
-        } else {
+        }
+        else
+        {
             printf("  Theoretical Peak FLOPS        : Not Available for Compute < 2.0\n");
         }
 
@@ -88,21 +99,22 @@ void CudaUtils::printCudaDeviceInfo() {
     }
 }
 
-void CudaUtils::check_cuda_error(cudaError_t err, const char *func, const char *file, int line) {
-    if (err != cudaSuccess) {
-        std::cerr << "CUDA Runtime Error at: " << file << ":" << line
-                  << std::endl;
+void CudaUtils::check_cuda_error(cudaError_t err, const char *func, const char *file, int line)
+{
+    if (err != cudaSuccess)
+    {
+        std::cerr << "CUDA Runtime Error at: " << file << ":" << line << std::endl;
         std::cerr << cudaGetErrorString(err) << " " << func << std::endl;
         std::exit(EXIT_FAILURE);
     }
 }
 
-void CudaUtils::check_last_cuda_error(const char *file, int line) {
+void CudaUtils::check_last_cuda_error(const char *file, int line)
+{
     cudaError_t const err{cudaGetLastError()};
     if (err != cudaSuccess)
     {
-        std::cerr << "CUDA Runtime Error at: " << file << ":" << line
-                  << std::endl;
+        std::cerr << "CUDA Runtime Error at: " << file << ":" << line << std::endl;
         std::cerr << cudaGetErrorString(err) << std::endl;
         std::exit(EXIT_FAILURE);
     }

@@ -2,25 +2,24 @@
 // Created by wookie on 12/5/24
 //
 
-
 #ifndef CUDAKMEANS_KMEANSVALIDATOR_H
 #define CUDAKMEANS_KMEANSVALIDATOR_H
 
 #include <string>
 #include <vector>
 
-
-#include <string>
 #include <cstdint>
+#include <string>
 
 /**
  * @class KMeansValidator
  * @brief Validates the results of the K-Means algorithm by comparing centroids and labels from two different files.
  * One file is considered the ground truth and the other is the results to be validated.
  */
-class [[maybe_unused]] KMeansValidator {
-public:
-    KMeansValidator() = delete;
+class [[maybe_unused]] KMeansValidator
+{
+    public:
+    KMeansValidator()  = delete;
     ~KMeansValidator() = delete;
 
     /**
@@ -31,6 +30,6 @@ public:
      * @param k The number of clusters.
      * @return True if validation is successful, false otherwise.
      */
-    static bool ValidateResults(const std::string& truthFile, const std::string& testedFile, int d, int k);
+    static bool ValidateResults(const std::string &truthFile, const std::string &testedFile, int d, int k);
 };
-#endif //CUDAKMEANS_KMEANSVALIDATOR_H
+#endif // CUDAKMEANS_KMEANSVALIDATOR_H

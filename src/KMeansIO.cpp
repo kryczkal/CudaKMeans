@@ -6,15 +6,18 @@
 #include <cstdio>
 #include <cstdlib>
 
-bool KMeansIO::LoadDataFromTextFile(const std::string& filename, float*& data, int& N, int& d, int& k) {
-    FILE* fp = fopen(filename.c_str(), "r");
-    if (!fp) {
+bool KMeansIO::LoadDataFromTextFile(const std::string &filename, float *&data, int &N, int &d, int &k)
+{
+    FILE *fp = fopen(filename.c_str(), "r");
+    if (!fp)
+    {
         perror("Failed to open file for reading");
         return false;
     }
 
     // Read N, d, k from the first line
-    if (fscanf(fp, "%d %d %d", &N, &d, &k) != 3) {
+    if (fscanf(fp, "%d %d %d", &N, &d, &k) != 3)
+    {
         fprintf(stderr, "Failed to read N, d, k from file\n");
         fclose(fp);
         return false;
@@ -24,9 +27,12 @@ bool KMeansIO::LoadDataFromTextFile(const std::string& filename, float*& data, i
     data = new float[N * d];
 
     // Read N lines of data
-    for (int i = 0; i < N; ++i) {
-        for (int j = 0; j < d; ++j) {
-            if (fscanf(fp, "%f", &data[i * d + j]) != 1) {
+    for (int i = 0; i < N; ++i)
+    {
+        for (int j = 0; j < d; ++j)
+        {
+            if (fscanf(fp, "%f", &data[i * d + j]) != 1)
+            {
                 fprintf(stderr, "Failed to read data at point %d, dimension %d\n", i, j);
                 free(data);
                 fclose(fp);
@@ -39,18 +45,20 @@ bool KMeansIO::LoadDataFromTextFile(const std::string& filename, float*& data, i
     return true;
 }
 
-bool KMeansIO::LoadDataFromBinaryFile(const std::string& filename, float*& data, int& N, int& d, int& k) {
-    FILE* fp = fopen(filename.c_str(), "rb");
-    if (!fp) {
+bool KMeansIO::LoadDataFromBinaryFile(const std::string &filename, float *&data, int &N, int &d, int &k)
+{
+    FILE *fp = fopen(filename.c_str(), "rb");
+    if (!fp)
+    {
         perror("Failed to open binary file for reading");
         return false;
     }
 
     // Read N, d, k from the first 12 bytes
     int32_t N_int32, d_int32, k_int32;
-    if (fread(&N_int32, sizeof(int32_t), 1, fp) != 1 ||
-        fread(&d_int32, sizeof(int32_t), 1, fp) != 1 ||
-        fread(&k_int32, sizeof(int32_t), 1, fp) != 1) {
+    if (fread(&N_int32, sizeof(int32_t), 1, fp) != 1 || fread(&d_int32, sizeof(int32_t), 1, fp) != 1 ||
+        fread(&k_int32, sizeof(int32_t), 1, fp) != 1)
+    {
         fprintf(stderr, "Failed to read N, d, k from binary file\n");
         fclose(fp);
         return false;
@@ -64,7 +72,8 @@ bool KMeansIO::LoadDataFromBinaryFile(const std::string& filename, float*& data,
 
     // Read N * d floats
     size_t num_read = fread(data, sizeof(float), N * d, fp);
-    if (num_read != static_cast<int>(N * d)) {
+    if (num_read != static_cast<int>(N * d))
+    {
         fprintf(stderr, "Failed to read data from binary file\n");
         free(data);
         fclose(fp);
@@ -75,30 +84,40 @@ bool KMeansIO::LoadDataFromBinaryFile(const std::string& filename, float*& data,
     return true;
 }
 
-bool KMeansIO::WriteResultsToTextFile(const std::string& filename, const float* centroids, const int* labels, int N, int d, int k) {
-    FILE* fp = fopen(filename.c_str(), "w");
-    if (!fp) {
+bool KMeansIO::WriteResultsToTextFile(
+    const std::string &filename, const float *centroids, const int *labels, int N, int d, int k
+)
+{
+    FILE *fp = fopen(filename.c_str(), "w");
+    if (!fp)
+    {
         perror("Failed to open file for writing");
         return false;
     }
 
     // First k lines: centroids
-    for (int i = 0; i < k; ++i) {
-        for (int j = 0; j < d; ++j) {
-            if (fprintf(fp, "%f", centroids[i * d + j]) < 0) {
+    for (int i = 0; i < k; ++i)
+    {
+        for (int j = 0; j < d; ++j)
+        {
+            if (fprintf(fp, "%f", centroids[i * d + j]) < 0)
+            {
                 fprintf(stderr, "Failed to write centroid data\n");
                 fclose(fp);
                 return false;
             }
-            if (j < d - 1) {
-                if (fprintf(fp, " ") < 0) {
+            if (j < d - 1)
+            {
+                if (fprintf(fp, " ") < 0)
+                {
                     fprintf(stderr, "Failed to write space\n");
                     fclose(fp);
                     return false;
                 }
             }
         }
-        if (fprintf(fp, "\n") < 0) {
+        if (fprintf(fp, "\n") < 0)
+        {
             fprintf(stderr, "Failed to write newline\n");
             fclose(fp);
             return false;
@@ -106,25 +125,28 @@ bool KMeansIO::WriteResultsToTextFile(const std::string& filename, const float* 
     }
 
     // Next N lines: labels
-    for (int i = 0; i < N; ++i) {
-        const char* format = (i < N - 1) ? "%d\n" : "%d";
-        if (fprintf(fp, format, labels[i]) < 0) {
+    for (int i = 0; i < N; ++i)
+    {
+        const char *format = (i < N - 1) ? "%d\n" : "%d";
+        if (fprintf(fp, format, labels[i]) < 0)
+        {
             fprintf(stderr, "Failed to write label data\n");
             fclose(fp);
             return false;
         }
     }
 
-
     fclose(fp);
     return true;
 }
 
-bool
-KMeansIO::LoadResultsFromTextFile(const std::string &filename, float *&centroids, int *&labels, int &N, int d,
-                                  int k) {
-    FILE* fp = fopen(filename.c_str(), "r");
-    if (!fp) {
+bool KMeansIO::LoadResultsFromTextFile(
+    const std::string &filename, float *&centroids, int *&labels, int &N, int d, int k
+)
+{
+    FILE *fp = fopen(filename.c_str(), "r");
+    if (!fp)
+    {
         perror("Failed to open file for reading");
         return false;
     }
@@ -134,24 +156,28 @@ KMeansIO::LoadResultsFromTextFile(const std::string &filename, float *&centroids
 
     // Read centroids
     char line[1024];
-    for (int i = 0; i < k; ++i) {
-        if (!fgets(line, sizeof(line), fp)) {
+    for (int i = 0; i < k; ++i)
+    {
+        if (!fgets(line, sizeof(line), fp))
+        {
             fprintf(stderr, "Failed to read centroid line %d\n", i);
             fclose(fp);
             delete[] centroids;
             return false;
         }
 
-        char* token = strtok(line, " \t\n");
-        for (int j = 0; j < d; ++j) {
-            if (!token) {
+        char *token = strtok(line, " \t\n");
+        for (int j = 0; j < d; ++j)
+        {
+            if (!token)
+            {
                 fprintf(stderr, "Insufficient data in centroid line %d\n", i);
                 fclose(fp);
                 delete[] centroids;
                 return false;
             }
             centroids[i * d + j] = static_cast<float>(atof(token));
-            token = strtok(nullptr, " \t\n");
+            token                = strtok(nullptr, " \t\n");
         }
     }
 
@@ -160,7 +186,8 @@ KMeansIO::LoadResultsFromTextFile(const std::string &filename, float *&centroids
 
     // Count the number of labels (N)
     N = 0;
-    while (fgets(line, sizeof(line), fp)) {
+    while (fgets(line, sizeof(line), fp))
+    {
         N++;
     }
 
@@ -171,8 +198,10 @@ KMeansIO::LoadResultsFromTextFile(const std::string &filename, float *&centroids
     fseek(fp, labels_start_pos, SEEK_SET);
 
     // Read labels
-    for (int i = 0; i < N; ++i) {
-        if (!fgets(line, sizeof(line), fp)) {
+    for (int i = 0; i < N; ++i)
+    {
+        if (!fgets(line, sizeof(line), fp))
+        {
             fprintf(stderr, "Failed to read label line %d\n", i);
             fclose(fp);
             delete[] centroids;
@@ -183,4 +212,5 @@ KMeansIO::LoadResultsFromTextFile(const std::string &filename, float *&centroids
     }
 
     fclose(fp);
-    return true;}
+    return true;
+}

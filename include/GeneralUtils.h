@@ -7,8 +7,9 @@
 
 #include <cinttypes>
 
-class GeneralUtils {
-public:
+class GeneralUtils
+{
+    public:
     /**
      * @brief Function to check if the given memory size fits into the global memory of the device
      * @param mem_size_bytes - size of the memory in bytes
@@ -39,7 +40,8 @@ public:
      * The function visualizes the K-means clustering result by projecting the data points and centroids to 2D space
      * using PCA and then mapping the projected points to a grid.
      */
-    [[maybe_unused]] static void visualizeKmeans(const float* data, const float* centroids, const int* labels, uint N, uint D, uint K);
+    [[maybe_unused]] static void
+    visualizeKmeans(const float *data, const float *centroids, const int *labels, uint N, uint D, uint K);
 };
 
-#endif //CUDAKMEANS_GENERALUTILS_H
+#endif // CUDAKMEANS_GENERALUTILS_H
