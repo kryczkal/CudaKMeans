@@ -23,6 +23,8 @@ class KMeansWrappers
     static void Naive(float *data, float *centroids, int *labels, int n, int d, int k, int max_iter = 100);
     static void
     AtomicAddShmem(float *h_data, float *h_centroids, int *h_labels, int n, int d, int k, int max_iter = 100);
+    static void
+    ThrustVersion(float *h_data, float *h_centroids, int *h_labels, int n, int d, int k, int max_iter = 100);
 };
 
 #endif // CUDAKMEANS_KMEANSWRAPPERS_H

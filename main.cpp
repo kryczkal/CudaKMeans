@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
         KMeansWrappers::Cpu(data, centroids, labels, N, d, k, max_iterations);
         break;
     case ComputationMethod::GPU1:
-        KMeansWrappers::Naive(data, centroids, labels, N, d, k, max_iterations);
+        KMeansWrappers::ThrustVersion(data, centroids, labels, N, d, k, max_iterations);
         break;
     case ComputationMethod::GPU2:
         KMeansWrappers::AtomicAddShmem(data, centroids, labels, N, d, k, max_iterations);

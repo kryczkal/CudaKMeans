@@ -13,10 +13,10 @@
 enum class MEASURED_PHASE
 {
     DATA_TRANSFER,
-    KERNEL,
     DATA_TRANSFER_BACK,
+    KERNEL,
+    THRUST,
     CPU_COMPUTATION,
-    NONE
 };
 
 /*

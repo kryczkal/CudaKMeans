@@ -37,7 +37,7 @@ target_link_libraries(CudaKMeans CUDA::cudart)
 
 # Optionally, set compile options for CUDA files
 target_compile_options(CudaKMeans PRIVATE
-        $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>
+        $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math --extended-lambda>
 )
 
 if(NOT CMAKE_BUILD_TYPE)

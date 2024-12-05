@@ -23,7 +23,7 @@ void PerformanceClock::start(MEASURED_PHASE phase)
 {
     if (startEvents.find(phase) != startEvents.end())
     {
-        throw std::runtime_error("Cannot start a phase that is already started");
+        throw std::runtime_error("PerformanceClock::start: Cannot start a phase that is already started");
     }
     cudaEvent_t startEvent;
     CHECK_CUDA_ERROR(cudaEventCreate(&startEvent));
@@ -42,7 +42,7 @@ void PerformanceClock::stop(MEASURED_PHASE phase)
     auto it = startEvents.find(phase);
     if (it == startEvents.end())
     {
-        throw std::runtime_error("Cannot stop a phase that was not started");
+        throw std::runtime_error("PerformanceClock::stop: Cannot stop a phase that was not started");
     }
     cudaEvent_t startEvent = it->second;
 
@@ -84,6 +84,8 @@ const char *phaseToString(MEASURED_PHASE phase)
         return "Data transfer back time";
     case MEASURED_PHASE::CPU_COMPUTATION:
         return "CPU computation time";
+    case MEASURED_PHASE::THRUST:
+        return "Thrust time";
     default:
         return "Unknown phase";
     }
