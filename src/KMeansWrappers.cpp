@@ -9,12 +9,12 @@
 
 void KMeansWrappers::Cpu(const float *data, float *centroids, int *labels, int n, int d, int k, int max_iter)
 {
-    printf("Running CPU k-means\n");
-    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+    PerformanceClock clock;
 
     auto new_centroids = new float[k * d]();
     auto counts        = new float[k]();
 
+    clock.start(MEASURED_PHASE::CPU_COMPUTATION);
     bool changes = true;
     for (int i = 0; i < max_iter && changes; ++i)
     {
@@ -76,10 +76,8 @@ void KMeansWrappers::Cpu(const float *data, float *centroids, int *labels, int n
             counts[j] = 0;
         }
     }
-
-    std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    printf("CPU k-means took %ld ms\n", duration);
+    clock.stop(MEASURED_PHASE::CPU_COMPUTATION);
+    clock.printResults("CPU k-means");
 
     delete[] new_centroids;
     delete[] counts;
@@ -142,11 +140,13 @@ void KMeansWrappers::Naive(float *data, float *centroids, int *labels, int n, in
     CHECK_CUDA_ERROR(cudaFree(d_changes));
 }
 
-void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int n, int d, int k, int max_iter)
+void KMeansWrappers::AtomicAddShmem(float *h_data, float *h_centroids, int *h_labels, int n, int d, int k, int max_iter)
 {
     PerformanceClock clock;
+
     float *d_data, *d_centroids;
     int *d_labels, *d_counts;
+    bool *d_did_change;
 
     size_t data_size      = n * d * sizeof(float);
     size_t centroids_size = k * d * sizeof(float);
@@ -157,81 +157,120 @@ void KMeansWrappers::ReductionV1(float *data, float *centroids, int *labels, int
     CHECK_CUDA_ERROR(cudaMalloc(&d_centroids, centroids_size));
     CHECK_CUDA_ERROR(cudaMalloc(&d_labels, labels_size));
     CHECK_CUDA_ERROR(cudaMalloc(&d_counts, counts_size));
+    CHECK_CUDA_ERROR(cudaMalloc(&d_did_change, sizeof(bool)));
 
     clock.start(MEASURED_PHASE::DATA_TRANSFER);
-    CHECK_CUDA_ERROR(cudaMemcpy(d_data, data, data_size, cudaMemcpyHostToDevice));
-    CHECK_CUDA_ERROR(cudaMemcpy(d_centroids, centroids, centroids_size, cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(d_data, h_data, data_size, cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(d_centroids, h_centroids, centroids_size, cudaMemcpyHostToDevice));
     clock.stop(MEASURED_PHASE::DATA_TRANSFER);
 
     int threads_per_block = 256;
     int blocks_per_grid   = (n + threads_per_block - 1) / threads_per_block;
 
-    size_t shared_mem_size_label  = k * d * sizeof(float);
-    size_t shared_mem_size_update = (k * d * sizeof(float)) + (k * sizeof(int));
+    size_t shared_mem_size_label  = k * d * sizeof(float);                       // For labeling kernel
+    size_t shared_mem_size_update = (k * d * sizeof(float)) + (k * sizeof(int)); // For centroid update
 
-    auto h_counts = new int[k];
+    // Host arrays for counting points in each cluster - Debug only
+    auto counts = new int[k];
 
-    auto h_centroids = new float[k * d];
+    // Host convergence flag
+    auto h_did_change = new bool;
 
-    for (int iter = 0; iter < max_iter; ++iter)
+    auto old_labels = new int[n];
+    memcpy(old_labels, h_labels, n * sizeof(int));
+
+    for (int iter = 1; iter <= max_iter; ++iter)
     {
         // Labeling step
+        // Reset did_change flag
+        clock.start(MEASURED_PHASE::DATA_TRANSFER);
+        CHECK_CUDA_ERROR(cudaMemset(d_did_change, 0, sizeof(bool)));
+        clock.stop(MEASURED_PHASE::DATA_TRANSFER);
+        // Assign labels
         clock.start(MEASURED_PHASE::KERNEL);
-        reduction_v1_labeling<<<blocks_per_grid, threads_per_block, shared_mem_size_label>>>(
-            d_data, d_centroids, d_labels, n, d, k
+        shmem_labeling<<<blocks_per_grid, threads_per_block, shared_mem_size_label>>>(
+            d_data, d_centroids, d_labels, d_did_change, n, d, k
         );
         cudaDeviceSynchronize();
         CHECK_LAST_CUDA_ERROR();
+        clock.stop(MEASURED_PHASE::KERNEL);
 
-        // Reset centroids and counts on device
+        // Convergence check
+        clock.start(MEASURED_PHASE::DATA_TRANSFER_BACK);
+        CHECK_CUDA_ERROR(cudaMemcpy(h_did_change, d_did_change, sizeof(bool), cudaMemcpyDeviceToHost));
+        clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
+        if (!*h_did_change)
+        {
+            break;
+        }
+
+        // Copy labels back to host to check how many changed
+        // I do not count this in the measured time since it is not necessary for the convergence check
+        // And only here for debugging purposes
+        CHECK_CUDA_ERROR(cudaMemcpy(h_labels, d_labels, labels_size, cudaMemcpyDeviceToHost));
+
+        int changed_count = 0;
+        for (int i = 0; i < n; i++)
+        {
+            if (h_labels[i] != old_labels[i])
+            {
+                changed_count++;
+            }
+        }
+        // Print iteration info
+        printf("Iteration %d: %d points changed their cluster\n", iter, changed_count);
+
+        // Reset centroids and counts on device before centroid update
+        clock.start(MEASURED_PHASE::KERNEL);
         CHECK_CUDA_ERROR(cudaMemset(d_centroids, 0, centroids_size));
         CHECK_CUDA_ERROR(cudaMemset(d_counts, 0, counts_size));
 
         // Centroid update step
-        reduction_v1_centroid_update<<<blocks_per_grid, threads_per_block, shared_mem_size_update>>>(
+        atomic_add_shmem_centroid_update<<<blocks_per_grid, threads_per_block, shared_mem_size_update>>>(
             d_data, d_labels, d_centroids, d_counts, n, d, k
         );
         cudaDeviceSynchronize();
         CHECK_LAST_CUDA_ERROR();
         clock.stop(MEASURED_PHASE::KERNEL);
 
-        // Update centroids
-        clock.start(MEASURED_PHASE::DATA_TRANSFER_BACK);
         // Copy counts and centroids to host
-        cudaMemcpy(h_counts, d_counts, counts_size, cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_centroids, d_centroids, centroids_size, cudaMemcpyDeviceToHost);
+        clock.start(MEASURED_PHASE::DATA_TRANSFER_BACK);
+        CHECK_CUDA_ERROR(cudaMemcpy(counts, d_counts, counts_size, cudaMemcpyDeviceToHost));
+        CHECK_CUDA_ERROR(cudaMemcpy(h_centroids, d_centroids, centroids_size, cudaMemcpyDeviceToHost));
         clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
 
-        // Update centroids on host
         clock.start(MEASURED_PHASE::CPU_COMPUTATION);
+        // Update centroids on host
+        // If h_counts[i] > 0 , compute new centroid
+        // If h_counts[i] == 0, keep the old centroid
         for (int i = 0; i < k; ++i)
         {
-            if (h_counts[i] > 0)
+            if (counts[i] > 0)
             {
                 for (int j = 0; j < d; ++j)
                 {
-                    h_centroids[i * d + j] /= (float)h_counts[i];
+                    h_centroids[i * d + j] /= (float)counts[i];
                 }
             }
         }
         clock.stop(MEASURED_PHASE::CPU_COMPUTATION);
 
-        // Copy updated centroids back to device
+        // Copy updated centroids back to device for next iteration
         clock.start(MEASURED_PHASE::DATA_TRANSFER);
-        cudaMemcpy(d_centroids, h_centroids, centroids_size, cudaMemcpyHostToDevice);
+        CHECK_CUDA_ERROR(cudaMemcpy(d_centroids, h_centroids, centroids_size, cudaMemcpyHostToDevice));
         clock.stop(MEASURED_PHASE::DATA_TRANSFER);
-    }
 
-    // Copy final labels and centroids back to host
+        memcpy(old_labels, h_labels, n * sizeof(int)); // Not in measured time since used only for debugging
+    }
+    // Copy centroids back to host
     clock.start(MEASURED_PHASE::DATA_TRANSFER_BACK);
-    cudaMemcpy(labels, d_labels, labels_size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(centroids, d_centroids, centroids_size, cudaMemcpyDeviceToHost);
+    CHECK_CUDA_ERROR(cudaMemcpy(h_centroids, d_centroids, centroids_size, cudaMemcpyDeviceToHost));
     clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
 
-    clock.printResults("Reduction v1 k-means");
+    clock.printResults("Reduction v1 k-means atomicAdd version");
 
-    delete[] h_counts;
-    delete[] h_centroids;
+    delete[] counts;
+    delete[] old_labels;
 
     cudaFree(d_data);
     cudaFree(d_centroids);

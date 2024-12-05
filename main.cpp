@@ -175,15 +175,6 @@ int main(int argc, char *argv[])
     auto *centroids = new float[k * d];
     int *labels     = new int[N];
 
-    if (centroids == nullptr || labels == nullptr)
-    {
-        std::cerr << "Failed to allocate memory for centroids and labels\n";
-        free(data);
-        free(centroids);
-        free(labels);
-        return EXIT_FAILURE;
-    }
-
     std::cout << "Initializing centroids and labels\n";
     // Initialize centroids to first k points
     std::memcpy(centroids, data, k * d * sizeof(float));
@@ -205,7 +196,7 @@ int main(int argc, char *argv[])
         KMeansWrappers::Naive(data, centroids, labels, N, d, k, max_iterations);
         break;
     case ComputationMethod::GPU2:
-        KMeansWrappers::ReductionV1(data, centroids, labels, N, d, k, max_iterations);
+        KMeansWrappers::AtomicAddShmem(data, centroids, labels, N, d, k, max_iterations);
         break;
     default:
         // Should not reach here due to earlier validation

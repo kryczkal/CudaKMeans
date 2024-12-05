@@ -95,11 +95,14 @@ void PerformanceClock::printResults(std::optional<std::string> kernel_name) cons
     {
         printf("%-25s: %s\n", "Kernel", kernel_name.value().c_str());
     }
+    double total_time = 0.0;
     for (const auto &pair : cumulativeTimes)
     {
-        MEASURED_PHASE phase   = pair.first;
-        double time            = pair.second;
+        MEASURED_PHASE phase = pair.first;
+        double time          = pair.second;
+        total_time += time;
         const char *phase_name = phaseToString(phase);
         printf("%-25s: %10.3f ms\n", phase_name, time);
     }
+    printf("%-25s: %10.3f ms\n", "Total time", total_time);
 }

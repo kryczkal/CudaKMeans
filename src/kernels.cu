@@ -48,7 +48,7 @@ __global__ void naive_centroid_update(const float* data, const int* labels, floa
     }
 }
 
-__global__ void reduction_v1_labeling(const float *data, const float *centroids, int *labels, int n, int d, int k) {
+__global__ void shmem_labeling(const float *data, const float *centroids, int *labels, bool* did_change, int n, int d, int k) {
     extern __shared__ float s_centroids[]; // Shared memory for centroids
 
     int tid = threadIdx.x;
@@ -78,18 +78,26 @@ __global__ void reduction_v1_labeling(const float *data, const float *centroids,
                 label = c;
             }
         }
+
+        if (labels[i] != label) {
+            *did_change = true;
+        }
         labels[i] = label;
     }
 }
 
 __global__ void
-reduction_v1_centroid_update(const float *data, const int *labels, float *centroids, int *counts, int n, int d, int k) {
-    extern __shared__ float s_data[]; // Shared memory for local sums and counts
+atomic_add_shmem_centroid_update(const float *data, const int *labels, float *centroids, int *counts, int n, int d, int k)
+{
+    extern __shared__ float s_data[]; // shared memory
 
-    float *s_sums = s_data;                     // Size: k * d
-    int *s_counts = (int*)&s_sums[k * d];       // Size: k
+    // s_sums: k*d floats for partial centroid sums
+    // s_counts: k ints for partial counts
+    float *s_sums = s_data;
+    int *s_counts = (int *)&s_sums[k * d];
 
     int tid = threadIdx.x;
+    int global_id = blockIdx.x * blockDim.x + tid;
 
     // Initialize shared memory
     for (int i = tid; i < k * d; i += blockDim.x) {
@@ -100,8 +108,8 @@ reduction_v1_centroid_update(const float *data, const int *labels, float *centro
     }
     __syncthreads();
 
-    // Each thread processes multiple data points
-    for (int i = blockIdx.x * blockDim.x + tid; i < n; i += gridDim.x * blockDim.x) {
+    // Accumulate local sums
+    for (int i = global_id; i < n; i += gridDim.x * blockDim.x) {
         int label = labels[i];
         atomicAdd(&s_counts[label], 1);
         for (int j = 0; j < d; ++j) {
@@ -110,7 +118,7 @@ reduction_v1_centroid_update(const float *data, const int *labels, float *centro
     }
     __syncthreads();
 
-    // Write shared memory to global memory
+    // Write shared results to global memory
     for (int i = tid; i < k * d; i += blockDim.x) {
         atomicAdd(&centroids[i], s_sums[i]);
     }
