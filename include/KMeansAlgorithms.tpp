@@ -197,8 +197,9 @@ void KMeansAlgorithms::AtomicAddShmem(float *h_data, float *h_centroids, int *h_
 
         // Assign labels
         clock.start(MEASURED_PHASE::LABEL_ASSIGNMENT);
-        shmem_labeling<D,K><<<blocks_per_grid, threads_per_block, shared_mem_size_label>>>(
-                d_data, d_centroids, d_labels, d_did_change, n
+        // Non-templated version of this kernel works faster
+        shmem_labeling<<<blocks_per_grid, threads_per_block, shared_mem_size_label>>>(
+                d_data, d_centroids, d_labels, d_did_change, n, D, K
         );
         cudaDeviceSynchronize();
         CHECK_LAST_CUDA_ERROR();
