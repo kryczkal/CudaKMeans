@@ -17,7 +17,9 @@ enum class MEASURED_PHASE
     KERNEL,
     THRUST,
     CPU_COMPUTATION,
-    TOTAL
+    TOTAL,
+    LABEL_ASSIGNMENT,
+    CENTROID_UPDATE,
 };
 
 /*

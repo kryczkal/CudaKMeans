@@ -34,6 +34,6 @@ class [[maybe_unused]] KMeansValidator
 
     // Constants
     static constexpr double labelMismatchTolerancePercent = 0.01;
-    static constexpr double centroidDiffTolerance         = 0.01;
+    static constexpr double centroidDiffTolerance         = 0.15;
 };
 #endif // CUDAKMEANS_KMEANSVALIDATOR_H

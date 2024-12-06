@@ -3,10 +3,12 @@
 //
 
 #include "CudaUtils.h"
+#include "Dispatchers.h"
 #include "GeneralUtils.h"
+#include "KMeansAlgorithms.h"
+#include "KMeansAlgorithmsWrappers.h"
 #include "KMeansIO.h"
 #include "KMeansValidator.h"
-#include "KMeansWrappers.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -182,29 +184,34 @@ int main(int argc, char *argv[])
     // Initialize labels to -1
     std::fill(labels, labels + N, -1);
 
-    const int max_iterations = 100;
-
     std::cout << "Running KMeans algorithm using " << computation_method_str << " method\n";
 
     // Run the KMeans algorithm based on the computation method
     switch (computation_method)
     {
     case ComputationMethod::CPU:
-        KMeansWrappers::Cpu(data, centroids, labels, N, d, k, max_iterations);
-        break;
+    {
+        KMeansAlgorithms::Cpu(data, centroids, labels, N, d, k);
+    }
+    break;
     case ComputationMethod::GPU1:
-        KMeansWrappers::ThrustVersion(data, centroids, labels, N, d, k, max_iterations);
-        break;
+    {
+        AtomicAddShmemLauncher launcher{data, centroids, labels, N};
+        DimensionDispatcher<2, 20>::dispatch(d, k, launcher);
+    }
+    break;
     case ComputationMethod::GPU2:
-        KMeansWrappers::AtomicAddShmem(data, centroids, labels, N, d, k, max_iterations);
-        break;
+    {
+    }
+    break;
     default:
-        // Should not reach here due to earlier validation
+    {
         std::cerr << "Invalid computation_method\n";
         free(data);
         free(centroids);
         free(labels);
         return EXIT_FAILURE;
+    }
     }
 
     std::cout << "Writing results to: " << output_file << std::endl;
@@ -230,10 +237,10 @@ int main(int argc, char *argv[])
         std::cout << "Comparing results with ground truth file: " << results_file_path << std::endl;
         if (!KMeansValidator::ValidateResults(results_file_path, output_file, d, k))
         {
-            std::cerr << "Results do not match\n";
+            std::cerr << "Results are beyond the assumed tolerance\n";
             return EXIT_FAILURE;
         }
-        std::cout << "Results match\n";
+        std::cout << "Results are within the assumed error tolerance\n";
     }
 
     std::cout << "Done\n";

@@ -86,6 +86,10 @@ const char *phaseToString(MEASURED_PHASE phase)
         return "CPU computation time";
     case MEASURED_PHASE::THRUST:
         return "Thrust time";
+    case MEASURED_PHASE::LABEL_ASSIGNMENT:
+        return "Label assignment time";
+    case MEASURED_PHASE::CENTROID_UPDATE:
+        return "Centroid update time";
     default:
         return "Unknown phase";
     }
