@@ -202,6 +202,7 @@ int main(int argc, char *argv[])
     break;
     case ComputationMethod::GPU2:
     {
+        KMeansAlgorithms::TreeReduction(data, centroids, labels, N, d, k);
     }
     break;
     default:
