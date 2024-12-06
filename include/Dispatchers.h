@@ -5,6 +5,8 @@
 #ifndef CUDAKMEANS_DISPATCHERS_H
 #define CUDAKMEANS_DISPATCHERS_H
 
+#include <stdexcept>
+
 template <int D_MIN, int D_MAX> struct DimensionDispatcher
 {
     template <typename Func> static void dispatch(int d, int k, Func f)
@@ -32,8 +34,7 @@ template <int D_MAX> struct DimensionDispatcher<D_MAX, D_MAX>
         }
         else
         {
-            // d is out of range, handle error or default
-            // For simplicity, do nothing or throw runtime_error
+            throw std::runtime_error("Dimension out of range");
         }
     }
 };
@@ -65,7 +66,7 @@ template <int K_MAX> struct ClusterDispatcher<K_MAX, K_MAX>
         }
         else
         {
-            // k out of range, handle error
+            throw std::runtime_error("Cluster count out of range");
         }
     }
 };
