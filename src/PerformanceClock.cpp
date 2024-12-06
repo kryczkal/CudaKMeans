@@ -93,18 +93,43 @@ const char *phaseToString(MEASURED_PHASE phase)
 
 void PerformanceClock::printResults(std::optional<std::string> kernel_name) const
 {
+    printDelimiter();
     if (kernel_name.has_value())
     {
         printf("%-25s: %s\n", "Kernel", kernel_name.value().c_str());
     }
-    double total_time = 0.0;
+    printDelimiter();
+    double sum_of_times = 0.0;
     for (const auto &pair : cumulativeTimes)
     {
         MEASURED_PHASE phase = pair.first;
-        double time          = pair.second;
-        total_time += time;
+        if (phase == MEASURED_PHASE::TOTAL)
+        {
+            continue;
+        }
+        double time = pair.second;
+        sum_of_times += time;
         const char *phase_name = phaseToString(phase);
         printf("%-25s: %10.3f ms\n", phase_name, time);
     }
-    printf("%-25s: %10.3f ms\n", "Total time", total_time);
+    printDelimiter();
+    if (cumulativeTimes.find(MEASURED_PHASE::TOTAL) != cumulativeTimes.end())
+    {
+        double everything_else = cumulativeTimes.at(MEASURED_PHASE::TOTAL) - sum_of_times;
+        printf("%-25s: %10.3f ms\n", "Sum of above", sum_of_times);
+        printDelimiter();
+        printf("%-25s: %10.3f ms\n", "Debug work", everything_else);
+        printf("%-25s: %10.3f ms\n", "Total time", cumulativeTimes.at(MEASURED_PHASE::TOTAL));
+    }
+    else
+    {
+        printf("Total time: %10.3f ms\n", sum_of_times);
+    }
+    printDelimiter();
+
+    printf("Debug work - time spent on operations not measured such as calculating exactly which labels changed (work "
+           "of no consequence to the algorithm itself)\n");
+    printDelimiter();
 }
+
+void PerformanceClock::printDelimiter() { printf("%-25s:\n", "-------------------------"); }

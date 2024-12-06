@@ -17,6 +17,7 @@ enum class MEASURED_PHASE
     KERNEL,
     THRUST,
     CPU_COMPUTATION,
+    TOTAL
 };
 
 /*
@@ -39,6 +40,7 @@ class PerformanceClock
 
     [[maybe_unused]] void reset();
     void printResults(std::optional<std::string> kernel_name = std::nullopt) const;
+    static void printDelimiter();
 
     private:
     // Private fields
