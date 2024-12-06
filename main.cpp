@@ -9,7 +9,6 @@
 #include "KMeansAlgorithmsWrappers.h"
 #include "KMeansIO.h"
 #include "KMeansValidator.h"
-#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -197,11 +196,13 @@ int main(int argc, char *argv[])
     case ComputationMethod::GPU1:
     {
         AtomicAddShmemLauncher launcher{data, centroids, labels, N};
-        DimensionDispatcher<2, 20>::dispatch(d, k, launcher);
+        launcher.run(d, k);
     }
     break;
     case ComputationMethod::GPU2:
     {
+        ThrustVersionLauncher launcher{data, centroids, labels, N};
+        launcher.run(d, k);
     }
     break;
     default:
