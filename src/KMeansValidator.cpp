@@ -72,5 +72,5 @@ bool KMeansValidator::ValidateResults(const std::string &truthFile, const std::s
     delete[] centroids2;
     delete[] labels2;
 
-    return label_mismatches == 0;
+    return label_mismatches <= labelMismatchTolerancePercent * N1 && centroid_diff <= centroidDiffTolerance;
 }

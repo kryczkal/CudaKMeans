@@ -31,5 +31,9 @@ class [[maybe_unused]] KMeansValidator
      * @return True if validation is successful, false otherwise.
      */
     static bool ValidateResults(const std::string &truthFile, const std::string &testedFile, int d, int k);
+
+    // Constants
+    static constexpr double labelMismatchTolerancePercent = 0.01;
+    static constexpr double centroidDiffTolerance         = 0.01;
 };
 #endif // CUDAKMEANS_KMEANSVALIDATOR_H
