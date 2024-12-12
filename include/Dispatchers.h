@@ -14,7 +14,7 @@ template <int D_MIN, int D_MAX> struct DimensionDispatcher
         if (d == D_MIN)
         {
             // Now dispatch on K
-            f.template run<D_MIN>(k);
+            f.template dimension_launch<D_MIN>(k);
         }
         else
         {
@@ -30,7 +30,7 @@ template <int D_MAX> struct DimensionDispatcher<D_MAX, D_MAX>
     {
         if (d == D_MAX)
         {
-            f.template run<D_MAX>(k);
+            f.template dimension_launch<D_MAX>(k);
         }
         else
         {
@@ -46,7 +46,7 @@ template <int K_MIN, int K_MAX> struct ClusterDispatcher
         if (k == K_MIN)
         {
             // We found the correct K, call the kernel function
-            kernelFunc.template launch<D, K_MIN>();
+            kernelFunc.template cluster_launch<D, K_MIN>();
         }
         else
         {
@@ -62,7 +62,7 @@ template <int K_MAX> struct ClusterDispatcher<K_MAX, K_MAX>
     {
         if (k == K_MAX)
         {
-            kernelFunc.template launch<D, K_MAX>();
+            kernelFunc.template cluster_launch<D, K_MAX>();
         }
         else
         {

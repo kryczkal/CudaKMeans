@@ -58,3 +58,6 @@ else()
             $<$<COMPILE_LANGUAGE:CUDA>:-g -G>      # Enable debug symbols and host/device memory checks
     )
 endif()
+
+find_package(raylib 5.0 REQUIRED)
+target_link_libraries(CudaKMeans raylib)

@@ -19,17 +19,19 @@ struct AtomicAddShmemLauncher
     {
         const AtomicAddShmemLauncher &wrapper;
 
-        template <int D_, int K_> void launch()
+        template <int D_, int K_> void cluster_launch()
         {
             KMeansAlgorithms::AtomicAddShmem<D_, K_>(wrapper.data, wrapper.centroids, wrapper.labels, wrapper.n);
         }
     };
 
-    template <int D> void run(int k)
+    template <int D> void dimension_launch(int k)
     {
         AtomicAddShmemKernel kernelFunc{*this};
         ClusterDispatcher<2, 20>::dispatch<D>(k, kernelFunc);
     }
+
+    void launch(int d, int k) { DimensionDispatcher<2, 20>::dispatch(d, k, *this); }
 };
 
 #endif // CUDAKMEANS_KMEANSALGORITHMSWRAPPERS_H

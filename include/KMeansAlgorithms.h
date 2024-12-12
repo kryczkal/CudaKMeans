@@ -18,6 +18,7 @@ class KMeansAlgorithms
     template <int D, int K> static void AtomicAddShmem(float *h_data, float *h_centroids, int *h_labels, int n);
 
     static void TreeReduction(float *h_data, float *h_centroids, int *h_labels, int n, int d, int k);
+    static void ThrustVersion(float *h_data, float *h_centroids, int *h_labels, int n, int d, int k, int max_iter);
 };
 
 #include "KMeansAlgorithms.tpp"
