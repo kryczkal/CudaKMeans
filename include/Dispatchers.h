@@ -7,13 +7,14 @@
 
 #include <stdexcept>
 
+// A set of dispatchers that effectively unroll to a switch statement at compile time
+
 template <int D_MIN, int D_MAX> struct DimensionDispatcher
 {
     template <typename Func> static void dispatch(int d, int k, Func f)
     {
         if (d == D_MIN)
         {
-            // Now dispatch on K
             f.template dimension_launch<D_MIN>(k);
         }
         else
@@ -45,7 +46,6 @@ template <int K_MIN, int K_MAX> struct ClusterDispatcher
     {
         if (k == K_MIN)
         {
-            // We found the correct K, call the kernel function
             kernelFunc.template cluster_launch<D, K_MIN>();
         }
         else

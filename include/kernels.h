@@ -17,16 +17,6 @@ template <int D, int K>
 __global__ void
 atomic_add_shmem_centroid_update(const float *data, const int *labels, float *centroids, int *counts, int n);
 
-struct LocalHistogram;
-
-__global__ void compute_local_histograms(
-    const float *data, const int *labels, float *partial_sums, int *partial_counts, int n, int d, int k,
-    int points_per_block
-);
-
-__global__ void
-tree_reduce_centroids(float *partial_sums, int *partial_counts, float *final_centroids, int num_blocks, int d, int k);
-
 #include "kernels.tpp"
 
 #endif // CUDAKMEANS_KERNELS_H

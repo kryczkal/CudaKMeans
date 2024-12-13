@@ -59,5 +59,40 @@ else()
     )
 endif()
 
-find_package(raylib 5.0 REQUIRED)
-target_link_libraries(CudaKMeans raylib)
+include(FetchContent)
+
+#FetchContent_Declare(
+#        raylib
+#        GIT_REPOSITORY https://github.com/raysan5/raylib.git
+#        GIT_TAG master
+#)
+#FetchContent_MakeAvailable(raylib)
+#
+#target_link_libraries(CudaKMeans raylib)
+
+# Fetch GLFW
+FetchContent_Declare(
+        glfw
+        GIT_REPOSITORY https://github.com/glfw/glfw.git
+        GIT_TAG        3.4
+)
+
+# Fetch GLAD
+FetchContent_Declare(
+        glad
+        GIT_REPOSITORY https://github.com/Dav1dde/glad.git
+        GIT_TAG        v2.0.8
+)
+
+# Fetch GLM
+FetchContent_Declare(
+        glm
+        GIT_REPOSITORY https://github.com/g-truc/glm.git
+        GIT_TAG        1.0.1
+)
+
+FetchContent_MakeAvailable(glfw glad glm)
+target_link_libraries(CudaKMeans glfw glad glm)
+target_include_directories(CudaKMeans PRIVATE ${glfw_SOURCE_DIR}/include ${glad_SOURCE_DIR}/include ${glm_SOURCE_DIR})
+
+file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})

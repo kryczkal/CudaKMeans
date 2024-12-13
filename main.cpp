@@ -265,8 +265,7 @@ void RunKmeans(
     break;
     case ComputationMethod::GPU2:
     {
-        //        KMeansAlgorithms::TreeReduction(data, centroids, labels, N, d, k);
-        KMeansAlgorithms::ThrustVersion(data, centroids, labels, N, d, k, 100);
+        KMeansAlgorithms::ThrustVersion(data, centroids, labels, N, d, k);
     }
     break;
     default:

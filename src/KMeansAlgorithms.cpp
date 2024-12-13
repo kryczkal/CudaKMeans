@@ -4,18 +4,16 @@
 
 #include "KMeansAlgorithms.h"
 #include "PerformanceClock.h"
-#include "Point.cuh"
 
 #include <thrust/device_vector.h>
-#include <thrust/execution_policy.h>
-#include <thrust/find.h>
-#include <thrust/functional.h>
+#include <thrust/gather.h>
 #include <thrust/host_vector.h>
 #include <thrust/iterator/constant_iterator.h>
 #include <thrust/iterator/discard_iterator.h>
 #include <thrust/pair.h>
 #include <thrust/reduce.h>
 #include <thrust/sort.h>
+#include <thrust/transform_reduce.h>
 
 void KMeansAlgorithms::Cpu(const float *data, float *centroids, int *labels, int n, int d, int k)
 {
@@ -93,179 +91,8 @@ void KMeansAlgorithms::Cpu(const float *data, float *centroids, int *labels, int
     delete[] counts;
 }
 
-// Helper to calculate optimal number of points per block based on available shared memory
-__host__ int calculate_optimal_points_per_block(int d, int k)
+void KMeansAlgorithms::ThrustVersion(float *h_data, float *h_centroids, int *h_labels, int n, int d, int k)
 {
-    int device;
-    cudaGetDevice(&device);
-
-    cudaDeviceProp props;
-    cudaGetDeviceProperties(&props, device);
-
-    size_t shared_mem_per_block = props.sharedMemPerBlock;
-    size_t histogram_size       = k * d * sizeof(float) + k * sizeof(int);
-    // Leave some shared memory for other purposes
-    size_t available_shared_mem = shared_mem_per_block * 0.8;
-
-    // Calculate maximum points that can fit in a block
-    int max_points = (available_shared_mem - histogram_size) / (sizeof(float) * d);
-
-    // Round down to nearest multiple of 32 for coalescing
-    max_points = (max_points / 32) * 32;
-
-    // Limit maximum points to avoid too large blocks
-    return std::min(max_points, 1024);
-}
-
-void update_centroids_tree_reduction(const float *d_data, const int *d_labels, float *d_centroids, int n, int d, int k)
-{
-    // Calculate optimal parameters
-    int points_per_block        = calculate_optimal_points_per_block(d, k);
-    const int threads_per_block = 256;
-    const int num_blocks        = (n + points_per_block - 1) / points_per_block;
-
-    // Allocate memory for partial results
-    float *d_partial_sums;
-    int *d_partial_counts;
-    CHECK_CUDA_ERROR(cudaMalloc(&d_partial_sums, num_blocks * k * d * sizeof(float)));
-    CHECK_CUDA_ERROR(cudaMalloc(&d_partial_counts, num_blocks * k * sizeof(int)));
-
-    // Initialize memory
-    CHECK_CUDA_ERROR(cudaMemset(d_partial_sums, 0, num_blocks * k * d * sizeof(float)));
-    CHECK_CUDA_ERROR(cudaMemset(d_partial_counts, 0, num_blocks * k * sizeof(int)));
-
-    // Shared memory size for local histograms
-    size_t shared_mem_size = k * d * sizeof(float) + k * sizeof(int);
-
-    // Compute local histograms
-    compute_local_histograms<<<num_blocks, threads_per_block, shared_mem_size>>>(
-        d_data, d_labels, d_partial_sums, d_partial_counts, n, d, k, points_per_block
-    );
-    cudaDeviceSynchronize();
-    CHECK_LAST_CUDA_ERROR();
-
-    // Tree reduction
-    tree_reduce_centroids<<<1, threads_per_block, shared_mem_size>>>(
-        d_partial_sums, d_partial_counts, d_centroids, num_blocks, d, k
-    );
-    cudaDeviceSynchronize();
-    CHECK_LAST_CUDA_ERROR();
-
-    // Cleanup
-    cudaFree(d_partial_sums);
-    cudaFree(d_partial_counts);
-}
-
-void KMeansAlgorithms::TreeReduction(float *h_data, float *h_centroids, int *h_labels, int n, int d, int k)
-{
-    PerformanceClock clock;
-    clock.start(MEASURED_PHASE::TOTAL);
-
-    // Allocate device memory
-    clock.start(MEASURED_PHASE::DATA_TRANSFER);
-    float *d_data, *d_centroids;
-    int *d_labels;
-    bool *d_did_change;
-
-    size_t data_size      = n * d * sizeof(float);
-    size_t centroids_size = k * d * sizeof(float);
-    size_t labels_size    = n * sizeof(int);
-
-    CHECK_CUDA_ERROR(cudaMalloc(&d_data, data_size));
-    CHECK_CUDA_ERROR(cudaMalloc(&d_centroids, centroids_size));
-    CHECK_CUDA_ERROR(cudaMalloc(&d_labels, labels_size));
-    CHECK_CUDA_ERROR(cudaMalloc(&d_did_change, sizeof(bool)));
-
-    // Copy data and initial centroids to device
-    CHECK_CUDA_ERROR(cudaMemcpy(d_data, h_data, data_size, cudaMemcpyHostToDevice));
-    CHECK_CUDA_ERROR(cudaMemcpy(d_centroids, h_centroids, centroids_size, cudaMemcpyHostToDevice));
-
-    int threads_per_block        = 256;
-    int blocks_per_grid          = (n + threads_per_block - 1) / threads_per_block;
-    size_t shared_mem_size_label = k * d * sizeof(float);
-
-    // Host flag for convergence
-    auto h_did_change = new bool;
-    clock.stop(MEASURED_PHASE::DATA_TRANSFER);
-
-    // Keep old labels for counting changes - debug only
-    auto old_labels = new int[n];
-    memcpy(old_labels, h_labels, n * sizeof(int));
-
-    for (int iter = 1; iter <= max_iter; ++iter)
-    {
-        // Reset did_change flag
-        clock.start(MEASURED_PHASE::DATA_TRANSFER);
-        CHECK_CUDA_ERROR(cudaMemset(d_did_change, 0, sizeof(bool)));
-        clock.stop(MEASURED_PHASE::DATA_TRANSFER);
-
-        // Assign labels
-        clock.start(MEASURED_PHASE::LABEL_ASSIGNMENT);
-        shmem_labeling<<<blocks_per_grid, threads_per_block, shared_mem_size_label>>>(
-            d_data, d_centroids, d_labels, d_did_change, n, d, k
-        );
-        cudaDeviceSynchronize();
-        CHECK_LAST_CUDA_ERROR();
-        clock.stop(MEASURED_PHASE::LABEL_ASSIGNMENT);
-
-        // Check convergence
-        clock.start(MEASURED_PHASE::DATA_TRANSFER_BACK);
-        CHECK_CUDA_ERROR(cudaMemcpy(h_did_change, d_did_change, sizeof(bool), cudaMemcpyDeviceToHost));
-        clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
-        if (!*h_did_change)
-        {
-            break;
-        }
-
-        // Copy labels back to host for debugging
-        CHECK_CUDA_ERROR(cudaMemcpy(h_labels, d_labels, labels_size, cudaMemcpyDeviceToHost));
-        int changed_count = 0;
-        for (int i = 0; i < n; i++)
-        {
-            if (h_labels[i] != old_labels[i])
-                changed_count++;
-        }
-        printf("Iteration %d: %d points changed their cluster\n", iter, changed_count);
-
-        // Update centroids using tree reduction
-        clock.start(MEASURED_PHASE::CENTROID_UPDATE);
-        update_centroids_tree_reduction(d_data, d_labels, d_centroids, n, d, k);
-        cudaDeviceSynchronize();
-        CHECK_LAST_CUDA_ERROR();
-        clock.stop(MEASURED_PHASE::CENTROID_UPDATE);
-
-        memcpy(old_labels, h_labels, n * sizeof(int));
-    }
-
-    // Copy final results back to host
-    clock.start(MEASURED_PHASE::DATA_TRANSFER_BACK);
-    CHECK_CUDA_ERROR(cudaMemcpy(h_centroids, d_centroids, centroids_size, cudaMemcpyDeviceToHost));
-    CHECK_CUDA_ERROR(cudaMemcpy(h_labels, d_labels, labels_size, cudaMemcpyDeviceToHost));
-    clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
-
-    clock.stop(MEASURED_PHASE::TOTAL);
-    clock.printResults("Tree-based k-means reduction");
-
-    // Cleanup
-    delete[] old_labels;
-    delete h_did_change;
-
-    cudaFree(d_data);
-    cudaFree(d_centroids);
-    cudaFree(d_labels);
-    cudaFree(d_did_change);
-}
-
-#define D 4
-void KMeansAlgorithms::ThrustVersion(
-    float *h_data, float *h_centroids, int *h_labels, int n, int d, int k, int max_iter
-)
-{
-    if (d != D)
-    {
-        throw std::runtime_error("Thrust version only supports 4 dimensions");
-    }
-
     PerformanceClock clock;
 
     // Allocate device memory
@@ -283,7 +110,6 @@ void KMeansAlgorithms::ThrustVersion(
     CHECK_CUDA_ERROR(cudaMalloc(&d_labels, labels_size));
     CHECK_CUDA_ERROR(cudaMalloc(&d_did_change, sizeof(bool)));
 
-    // Copy data and initial centroids to device
     CHECK_CUDA_ERROR(cudaMemcpy(d_data, h_data, data_size, cudaMemcpyHostToDevice));
     CHECK_CUDA_ERROR(cudaMemcpy(d_centroids, h_centroids, centroids_size, cudaMemcpyHostToDevice));
     clock.stop(MEASURED_PHASE::DATA_TRANSFER);
@@ -291,32 +117,27 @@ void KMeansAlgorithms::ThrustVersion(
     int threads_per_block = 256;
     int blocks_per_grid   = (n + threads_per_block - 1) / threads_per_block;
 
-    size_t shared_mem_size_label = k * d * sizeof(float); // For labeling kernel
+    size_t shared_mem_size_label = k * d * sizeof(float);
 
-    // Host flag for convergence
     auto h_did_change = new bool;
-
-    // Keep old labels for counting changes - debug only
-    auto old_labels = new int[n];
+    auto old_labels   = new int[n];
     memcpy(old_labels, h_labels, n * sizeof(int));
 
-    // Initialize device labels to 0
-    CHECK_CUDA_ERROR(cudaMemset(d_labels, 0, labels_size));
+    // Initialize device labels to -1
+    CHECK_CUDA_ERROR(cudaMemset(d_labels, -1, labels_size));
 
-    clock.start(MEASURED_PHASE::DATA_TRANSFER);
-    // Wrap raw pointers with thrust device pointers
     thrust::device_ptr<float> d_data_ptr(d_data);
     thrust::device_ptr<int> d_labels_ptr(d_labels);
-    auto *d_points = reinterpret_cast<Point<D> *>(thrust::raw_pointer_cast(d_data_ptr));
-    thrust::device_ptr<Point<D>> d_points_ptr(d_points);
 
-    // Temporary vectors used for sorting and reducing each iteration
     thrust::device_vector<int> d_labels_temp(n);
-    thrust::device_vector<Point<D>> d_points_temp(n);
+    // Create a device vector to store rearranged points
+    thrust::device_vector<float> d_points_temp(n * d);
+    thrust::device_vector<int> d_indices(n); // used for permutations
+
+    // For summation and key extraction after sorting
     thrust::device_vector<int> d_keys_out(k);
-    thrust::device_vector<Point<D>> d_sums(k);
+    thrust::device_vector<float> d_sums_dim(k);
     thrust::device_vector<int> d_counts(k);
-    clock.stop(MEASURED_PHASE::DATA_TRANSFER);
 
     for (int iter = 1; iter <= max_iter; ++iter)
     {
@@ -325,7 +146,7 @@ void KMeansAlgorithms::ThrustVersion(
         CHECK_CUDA_ERROR(cudaMemset(d_did_change, 0, sizeof(bool)));
         clock.stop(MEASURED_PHASE::DATA_TRANSFER);
 
-        // Labeling step
+        // Labeling kernel
         clock.start(MEASURED_PHASE::KERNEL);
         shmem_labeling<<<blocks_per_grid, threads_per_block, shared_mem_size_label>>>(
             d_data, d_centroids, d_labels, d_did_change, n, d, k
@@ -341,11 +162,10 @@ void KMeansAlgorithms::ThrustVersion(
 
         if (!*h_did_change)
         {
-            // No changes means convergence
             break;
         }
 
-        // Copy labels back to host for debugging
+        // Copy labels back to host - not needed for computation but useful for debugging
         CHECK_CUDA_ERROR(cudaMemcpy(h_labels, d_labels, labels_size, cudaMemcpyDeviceToHost));
         int changed_count = 0;
         for (int i = 0; i < n; i++)
@@ -355,67 +175,108 @@ void KMeansAlgorithms::ThrustVersion(
         }
         printf("Iteration %d: %d points changed their cluster\n", iter, changed_count);
 
-        // Compute new centroids using thrust reduce_by_key without disturbing original order
+        // Prepare data for centroid recomputation
+
+        clock.start(MEASURED_PHASE::DATA_TRANSFER);
+        // Copy current labels into d_labels_temp
+        thrust::copy(d_labels_ptr, d_labels_ptr + n, d_labels_temp.begin());
+
+        // Create a sequence of indices [0, 1, 2, ..., n-1]
+        thrust::sequence(d_indices.begin(), d_indices.end(), 0);
+        clock.stop(MEASURED_PHASE::DATA_TRANSFER);
+
         clock.start(MEASURED_PHASE::THRUST);
+        // Sort the indices by labels - this is used to later rearrange points
+        thrust::sort_by_key(d_labels_temp.begin(), d_labels_temp.end(), d_indices.begin());
 
-        // Copy original data and labels into temporary buffers
-        thrust::copy(thrust::device, d_labels_ptr, d_labels_ptr + n, d_labels_temp.begin());
-        thrust::copy(thrust::device, d_points_ptr, d_points_ptr + n, d_points_temp.begin());
+        // Rearrange points dimension-by-dimension using a transform iterator to map [0..n-1] -> [original_index*d +
+        // dim]
+        for (int dim = 0; dim < d; ++dim)
+        {
+            // Create a transform iterator that maps an index i to i*d + dim
+            auto dim_map_iter = thrust::make_transform_iterator(
+                thrust::counting_iterator<int>(0),
+                [=] __host__ __device__(int idx)
+                {
+                    return idx * d + dim;
+                }
+            );
 
-        // Sort points by cluster label (in temporary arrays)
-        thrust::sort_by_key(thrust::device, d_labels_temp.begin(), d_labels_temp.end(), d_points_temp.begin());
+            // Create a permutation iterator that picks the correct dim-th coordinate of each point:
+            auto dim_data_iter = thrust::make_permutation_iterator(d_data_ptr, dim_map_iter);
 
-        // First reduction: sum up all points per cluster
-        auto end_pair = thrust::reduce_by_key(
-            thrust::device, d_labels_temp.begin(), d_labels_temp.end(), d_points_temp.begin(), d_keys_out.begin(),
-            d_sums.begin()
-        );
-        int num_clusters_found = (int)(end_pair.first - d_keys_out.begin());
+            // Rearrange points according to sorted labels
+            thrust::gather(d_indices.begin(), d_indices.end(), dim_data_iter, d_points_temp.begin() + dim * n);
+        }
 
-        // Second reduction: count how many points per cluster
-        // Since each point contributes '1', we can reuse a constant iterator
+        // Now d_points_temp is stored in "dimension-major" form:
+        // For dim = 0, coordinates are at d_points_temp[0...n-1]
+        // For dim = 1, coordinates are at d_points_temp[n...2n-1], etc.
+        // Corresponding labels for each point are in d_labels_temp (sorted).
+
+        // First, get counts per cluster:
         thrust::fill(d_counts.begin(), d_counts.end(), 0);
         thrust::reduce_by_key(
-            thrust::device, d_labels_temp.begin(), d_labels_temp.end(), thrust::constant_iterator<int>(1),
+            d_labels_temp.begin(), d_labels_temp.end(), thrust::constant_iterator<int>(1),
             thrust::make_discard_iterator(), d_counts.begin()
         );
-
-        // Copy results back to host
-        thrust::host_vector<int> h_keys_out       = d_keys_out;
-        thrust::host_vector<Point<D>> h_sums_host = d_sums;
-        thrust::host_vector<int> h_counts_host    = d_counts;
         clock.stop(MEASURED_PHASE::THRUST);
 
-        // Compute final centroids on the host
-        clock.start(MEASURED_PHASE::CPU_COMPUTATION);
-        for (int cluster_id = 0; cluster_id < k; ++cluster_id)
+        // Reduce by key, dimension by dimension to sum coordinates by cluster.
+        // For each dim:
+        // - Use a slice of d_points_temp as values
+        // - Reduce by key using d_labels_temp as keys
+        // - Store sums in a temporary vector and then combine
+
+        // We'll store partial results on the host
+        clock.start(MEASURED_PHASE::DATA_TRANSFER);
+        thrust::host_vector<int> h_counts_host = d_counts;
+        thrust::host_vector<int> h_keys_host(k);
+        thrust::host_vector<float> h_sums_for_dim(k);
+        clock.stop(MEASURED_PHASE::DATA_TRANSFER);
+
+        // Perform the dimension-wise reductions
+        for (int dim = 0; dim < d; ++dim)
         {
-            // Find this cluster in h_keys_out
-            auto it = std::find(h_keys_out.begin(), h_keys_out.begin() + num_clusters_found, cluster_id);
-            if (it != h_keys_out.begin() + num_clusters_found)
+            // reduce_by_key for this dimension
+            clock.start(MEASURED_PHASE::THRUST);
+            auto values_begin = d_points_temp.begin() + dim * n;
+            auto end_pair     = thrust::reduce_by_key(
+                d_labels_temp.begin(), d_labels_temp.end(), values_begin, d_keys_out.begin(), d_sums_dim.begin()
+            );
+
+            int num_clusters_found = (int)(end_pair.first - d_keys_out.begin());
+            clock.stop(MEASURED_PHASE::THRUST);
+            // Copy results to host
+            clock.start(MEASURED_PHASE::DATA_TRANSFER_BACK);
+            thrust::host_vector<int> h_keys_out   = d_keys_out;
+            thrust::host_vector<float> h_sums_dim = d_sums_dim;
+            clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
+
+            // Accumulate dimension sums into h_centroids
+            clock.start(MEASURED_PHASE::CPU_COMPUTATION);
+            for (int cluster_id = 0; cluster_id < k; ++cluster_id)
             {
-                int idx = (int)(it - h_keys_out.begin());
-                int c   = h_counts_host[idx];
+                int c = h_counts_host[cluster_id];
                 if (c > 0)
                 {
-                    for (int dim = 0; dim < d; ++dim)
+                    // If a cluster has no points (is not found in keys), skip it
+                    auto it = std::find(h_keys_out.begin(), h_keys_out.begin() + num_clusters_found, cluster_id);
+                    if (it != h_keys_out.begin() + num_clusters_found)
                     {
-                        h_centroids[cluster_id * d + dim] = h_sums_host[idx].coords[dim] / (float)c;
+                        int idx                           = (int)(it - h_keys_out.begin());
+                        float sum_dim                     = h_sums_dim[idx];
+                        h_centroids[cluster_id * d + dim] = sum_dim / (float)c;
                     }
                 }
-                // If cluster is empty, keep old centroid (no change)
             }
-            else
-            {
-                // No points in this cluster, do not change centroid
-            }
+            clock.stop(MEASURED_PHASE::CPU_COMPUTATION);
         }
-        clock.stop(MEASURED_PHASE::CPU_COMPUTATION);
 
         // Copy updated centroids back to device
-        clock.start(MEASURED_PHASE::DATA_TRANSFER);
+        clock.start(MEASURED_PHASE::DATA_TRANSFER_BACK);
         CHECK_CUDA_ERROR(cudaMemcpy(d_centroids, h_centroids, centroids_size, cudaMemcpyHostToDevice));
-        clock.stop(MEASURED_PHASE::DATA_TRANSFER);
+        clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
 
         // Update old_labels for debugging
         memcpy(old_labels, h_labels, n * sizeof(int));
@@ -428,7 +289,6 @@ void KMeansAlgorithms::ThrustVersion(
 
     clock.printResults("Thrust-based k-means");
 
-    // Cleanup
     delete[] old_labels;
     delete h_did_change;
 
