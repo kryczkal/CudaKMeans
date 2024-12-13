@@ -10,6 +10,10 @@
 #include <string>
 #include <unordered_map>
 
+/**
+ * @enum MEASURED_PHASE
+ * @brief An enumeration of the different phases of the K-Means algorithm that can be measured.
+ */
 enum class MEASURED_PHASE
 {
     DATA_TRANSFER,
@@ -22,12 +26,11 @@ enum class MEASURED_PHASE
     CENTROID_UPDATE,
 };
 
-/*
- * Enables measuring performance of different phases:
- * Data transfer
- * Kernel execution
- * Data transfer back
- * CPU computation
+/**
+ * @class Performance Clock
+ * @brief A class for measuring the performance of different phases of the K-Means algorithm.
+ * The class uses CUDA events to measure the time taken by different phases of the algorithm.
+ * The measured times are accumulated and can be printed out at the end of the algorithm.
  */
 class PerformanceClock
 {

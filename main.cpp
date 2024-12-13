@@ -392,7 +392,11 @@ int main(int argc, char *argv[])
         if (d == 3)
         {
             std::cout << "Showing visualization\n";
-            RaylibVisualizer::Visualizer visualizer;
+#ifdef USE_VISUALIZER
+            VisualizerOpenGL visualizer;
+#else
+            VisualizerDummy visualizer;
+#endif
             visualizer.visualize3D(data, centroids, labels, N, k);
         }
         else

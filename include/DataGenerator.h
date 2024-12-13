@@ -5,6 +5,9 @@
 #ifndef CUDAKMEANS_DATAGENERATOR_H
 #define CUDAKMEANS_DATAGENERATOR_H
 
+/**
+ * @brief Class to generate random data points for KMeans clustering.
+ */
 class DataGenerator
 {
     public:

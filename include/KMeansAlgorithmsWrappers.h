@@ -8,6 +8,10 @@
 #include "Dispatchers.h"
 #include "KMeansAlgorithms.h"
 
+/**
+ * @brief A wrapper for the KMeansAlgorithms::AtomicAddShmem function.
+ * This wrapper is used to dispatch the correct template instantiation of the function.
+ */
 struct AtomicAddShmemLauncher
 {
     float *data;
@@ -35,6 +39,10 @@ struct AtomicAddShmemLauncher
 };
 
 // Read the comment in KMeansAlgorithms.tpp for more information about this function and why is it not used
+/**
+ * @brief A wrapper for the KMeansAlgorithms::ThrustVersionV2 function.
+ * This wrapper is used to dispatch the correct template instantiation of the function.
+ */
 struct ThrustVersionV2Launcher
 {
     float *data;

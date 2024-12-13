@@ -23,10 +23,8 @@ bool KMeansIO::LoadDataFromTextFile(const std::string &filename, float *&data, i
         return false;
     }
 
-    // Allocate memory for data
     data = new float[N * d];
 
-    // Read N lines of data
     for (int i = 0; i < N; ++i)
     {
         for (int j = 0; j < d; ++j)
@@ -67,7 +65,6 @@ bool KMeansIO::LoadDataFromBinaryFile(const std::string &filename, float *&data,
     d = static_cast<int>(d_int32);
     k = static_cast<int>(k_int32);
 
-    // Allocate memory for data
     data = new float[N * d];
 
     // Read N * d floats
@@ -151,7 +148,6 @@ bool KMeansIO::LoadResultsFromTextFile(
         return false;
     }
 
-    // Allocate memory for centroids
     centroids = new float[k * d];
 
     // Read centroids
@@ -184,20 +180,17 @@ bool KMeansIO::LoadResultsFromTextFile(
     // Remember the position of labels in the file
     long labels_start_pos = ftell(fp);
 
-    // Count the number of labels (N)
     N = 0;
     while (fgets(line, sizeof(line), fp))
     {
         N++;
     }
 
-    // Allocate memory for labels
     labels = new int[N];
 
     // Rewind to the start of labels
     fseek(fp, labels_start_pos, SEEK_SET);
 
-    // Read labels
     for (int i = 0; i < N; ++i)
     {
         if (!fgets(line, sizeof(line), fp))

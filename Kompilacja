@@ -1,0 +1,38 @@
+Instrukcje Kompilacji Programu CudaKMeans
+Poniżej znajdują się kroki niezbędne do skompilowania programu CudaKMeans na systemach Linux oraz Windows.
+Uwaga: Kompilacja na Windowsie nie była testowana.
+
+Wymagania Wstępne:
+CMake w wersji co najmniej 3.12
+GNU Make (dla Linuxa)
+Kompilator C++ obsługujący standard C++23
+CUDA Toolkit (wersja zgodna z architekturą CUDA Twojej karty graficznej)
+
+Kompilacja na Linuxie:
+Zainstaluj wymagane narzędzia i biblioteki: Upewnij się, że masz zainstalowany CMake, GCC/G++ oraz CUDA Toolkit
+
+Przejdz do katalogu z kodem źródłowym: Otwórz terminal i przejdź do katalogu, w którym znajduje się kod źródłowy programu CudaKMeans.
+
+Utwórz katalog build i przejdź do niego
+
+Skonfiguruj projekt za pomocą CMake. Aby włączyć wizualizację, użyj opcji -DUSE_VISUALIZER=ON
+```
+cmake -DUSE_VISUALIZER=ON ..
+```
+
+Uruchom kompilację programu
+```
+make
+```
+
+Uruchom program
+```
+./CudaKMeans
+```
+
+Kompilacja na Windowsie:
+Zainstaluj wymagane narzędzia i biblioteki: Upewnij się, że masz zainstalowany CMake, MinGW lub Visual Studio oraz CUDA Toolkit
+
+Użyj CMake GUI do konfiguracji projektu: Otwórz CMake GUI i wskaż ścieżkę do kodu źródłowego programu CudaKMeans.
+Alternatywnie Visual Studio w teorii powinno być w stanie obsłużyć pliki CMakeLists.txt
+https://learn.microsoft.com/pl-pl/cpp/build/cmake-projects-in-visual-studio?view=msvc-170

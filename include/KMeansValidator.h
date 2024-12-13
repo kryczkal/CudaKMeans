@@ -14,7 +14,7 @@
 /**
  * @class KMeansValidator
  * @brief Validates the results of the K-Means algorithm by comparing centroids and labels from two different files.
- * One file is considered the ground truth and the other is the results to be validated.
+ * If the results are within a certain tolerance, the validation is considered successful.
  */
 class [[maybe_unused]] KMeansValidator
 {

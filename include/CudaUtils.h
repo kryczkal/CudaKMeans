@@ -5,6 +5,9 @@
 #ifndef CUDAKMEANS_CUDAUTILS_H
 #define CUDAKMEANS_CUDAUTILS_H
 
+/**
+ * @brief Utility class for CUDA related functions
+ */
 class CudaUtils
 {
     public:
