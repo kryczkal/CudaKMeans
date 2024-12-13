@@ -168,6 +168,7 @@ template<int D>
 void KMeansAlgorithms::ThrustVersionV2(float *h_data, float *h_centroids, int *h_labels, int n, int k)
 {
 //    PerformanceClock clock;
+//    clock.start(MEASURED_PHASE::TOTAL);
 //
 //    // Allocate device memory
 //    float *d_data, *d_centroids;
@@ -326,6 +327,7 @@ void KMeansAlgorithms::ThrustVersionV2(float *h_data, float *h_centroids, int *h
 //    CHECK_CUDA_ERROR(cudaMemcpy(h_centroids, d_centroids, centroids_size, cudaMemcpyDeviceToHost));
 //    clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
 //
+//    clock.stop(MEASURED_PHASE::TOTAL);
 //    clock.printResults("Thrust-based k-means");
 //
 //    // Cleanup

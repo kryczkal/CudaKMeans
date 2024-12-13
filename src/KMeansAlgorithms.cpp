@@ -18,6 +18,7 @@
 void KMeansAlgorithms::Cpu(const float *data, float *centroids, int *labels, int n, int d, int k)
 {
     PerformanceClock clock;
+    clock.start(MEASURED_PHASE::TOTAL);
 
     auto new_centroids = new float[k * d]();
     auto counts        = new float[k]();
@@ -85,6 +86,7 @@ void KMeansAlgorithms::Cpu(const float *data, float *centroids, int *labels, int
         }
     }
     clock.stop(MEASURED_PHASE::CPU_COMPUTATION);
+    clock.stop(MEASURED_PHASE::TOTAL);
     clock.printResults("CPU k-means");
 
     delete[] new_centroids;
@@ -94,6 +96,7 @@ void KMeansAlgorithms::Cpu(const float *data, float *centroids, int *labels, int
 void KMeansAlgorithms::ThrustVersion(float *h_data, float *h_centroids, int *h_labels, int n, int d, int k)
 {
     PerformanceClock clock;
+    clock.start(MEASURED_PHASE::TOTAL);
 
     // Allocate device memory
     float *d_data, *d_centroids;
@@ -287,6 +290,7 @@ void KMeansAlgorithms::ThrustVersion(float *h_data, float *h_centroids, int *h_l
     CHECK_CUDA_ERROR(cudaMemcpy(h_centroids, d_centroids, centroids_size, cudaMemcpyDeviceToHost));
     clock.stop(MEASURED_PHASE::DATA_TRANSFER_BACK);
 
+    clock.stop(MEASURED_PHASE::TOTAL);
     clock.printResults("Thrust-based k-means");
 
     delete[] old_labels;
