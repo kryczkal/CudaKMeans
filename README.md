@@ -49,7 +49,7 @@ CUDA K-Means Clustering is a high-performance implementation of the K-Means algo
 
 ```bash
 git clone https://https://github.com/kryczkal/CudaKMeans
-cd cuda-kmeans-clustering
+cd CudaKMeans
 ```
 
 ### Build the Project
