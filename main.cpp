@@ -300,9 +300,6 @@ int main(int argc, char *argv[])
     int N = 0, d = 0, k = 0;
     parse_opt_args(argc, argv, compare_results, results_file_path, generate_data, show_visualization, N, d, k);
 
-    if (generate_data)
-        std::cout << "Generating random data: N=" << N << ", d=" << d << ", k=" << k << std::endl;
-
     // Map strings to enums for data formats
     std::unordered_map<std::string, DataFormat> data_format_map = {
         {"txt", DataFormat::TXT},
@@ -331,9 +328,9 @@ int main(int argc, char *argv[])
     float *data = nullptr;
     if (generate_data)
     {
-        std::cout << "Generating random data\n";
+        std::cout << "Generating random data: N=" << N << ", d=" << d << ", k=" << k << std::endl;
         DataGenerator data_generator{N, k, d};
-        data = data_generator.generateData();
+        data = data_generator.generateGaussianData(10, true);
     }
     else
     {

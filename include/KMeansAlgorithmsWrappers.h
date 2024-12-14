@@ -38,24 +38,4 @@ struct AtomicAddShmemLauncher
     void launch(int d, int k) { DimensionDispatcher<2, 20>::dispatch(d, k, *this); }
 };
 
-// Read the comment in KMeansAlgorithms.tpp for more information about this function and why is it not used
-/**
- * @brief A wrapper for the KMeansAlgorithms::ThrustVersionV2 function.
- * This wrapper is used to dispatch the correct template instantiation of the function.
- */
-struct ThrustVersionV2Launcher
-{
-    float *data;
-    float *centroids;
-    int *labels;
-    int n;
-
-    template <int D> void dimension_launch(int k)
-    {
-        KMeansAlgorithms::ThrustVersionV2<D>(data, centroids, labels, n, k);
-    }
-
-    void launch(int d, int k) { DimensionDispatcher<2, 20>::dispatch(d, k, *this); }
-};
-
 #endif // CUDAKMEANS_KMEANSALGORITHMSWRAPPERS_H

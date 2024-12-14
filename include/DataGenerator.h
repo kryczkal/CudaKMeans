@@ -19,6 +19,7 @@ class DataGenerator
      * @return A pointer to the generated data points.
      */
     [[maybe_unused]] [[nodiscard]] float *generateData(bool normalize = true) const;
+    [[maybe_unused]] [[nodiscard]] float *generateGaussianData(int numDistributions, bool normalize) const;
 
     private:
     int N;
