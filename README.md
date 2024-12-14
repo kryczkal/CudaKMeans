@@ -120,7 +120,7 @@ Execute the clustering algorithm by specifying the dataset and parameters.
 
 ## Visualization
 
-If compiled with the `USE_VISUALIZER` flag, the project includes an OpenGL-based 3D visualizer to interactively explore clustering results.
+If compiled with the `USE_VISUALIZER` flag, the project includes an OpenGL-based 3D visualizer to interactively explore clustering results (if `d` == `3`)
 
 ### Controls
 
